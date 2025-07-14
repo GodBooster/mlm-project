@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  bonus        Float         @default(0)
+  createdAt    DateTime      @default(now())
+  balance      Float         @default(0)
+  password     String
+  rank         String        @default("BRONZE")
+  referralCode String        @unique
+  referredBy   String?
+  wallet       String?
+  avatar       String?
+  updatedAt    DateTime      @updatedAt
+  username     String        @unique
+  isAdmin      Boolean       @default(false)
+  investments  Investment[]
+  transactions Transaction[]
+  referrer     User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
+  referrals    User[]        @relation("ReferralRelation")
+}
+
+model InvestmentPackage {
+  id           Int          @id @default(autoincrement())
+  name         String       @unique
+  minAmount    Float
+  monthlyYield Float
+  percent      Float        @default(0)
+  duration     Int
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  investments  Investment[]
+}
+
+model Investment {
+  id             Int               @id @default(autoincrement())
+  userId         Int
+  packageId      Int
+  amount         Float
+  startDate      DateTime          @default(now())
+  endDate        DateTime
+  isActive       Boolean           @default(true)
+  totalEarned    Float             @default(0)
+  lastProfitDate DateTime?
+  createdAt      DateTime          @default(now())
+  package        InvestmentPackage @relation(fields: [packageId], references: [id])
+  user           User              @relation(fields: [userId], references: [id])
+  transactions   Transaction[]
+}
+
+model Transaction {
+  id           Int               @id @default(autoincrement())
+  userId       Int
+  investmentId Int?
+  type         TransactionType
+  amount       Float
+  description  String
+  status       TransactionStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  investment   Investment?       @relation(fields: [investmentId], references: [id])
+  user         User              @relation(fields: [userId], references: [id])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  DAILY_PROFIT
+  REFERRAL_BONUS
+  RANK_BONUS
+  RANK_REWARD
+  BONUS
+  INVESTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
