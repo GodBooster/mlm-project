@@ -121,7 +121,6 @@ class RankRewardService {
         level: 0,
         name: 'No rank',
         turnover: 0,
-        prize: null
       }
     }
     // Если оборот >= 10000, ищем максимальный подходящий ранг
