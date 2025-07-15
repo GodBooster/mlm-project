@@ -851,8 +851,12 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
     const claimed = await rankRewardService.getClaimedRewards(userId)
     console.log('[RANK-REWARDS] claimed:', claimed)
     
-    // Если nextRank равен currentRank, значит достигнут максимальный ранг
-    const actualNextRank = (nextRank && nextRank.level !== currentRank.level) ? nextRank : null
+    // nextRank всегда следующий ранг, кроме максимального
+    const currentRankIndex = MLM_RANKS.findIndex(r => r.level === currentRank.level);
+    let actualNextRank = null;
+    if (currentRankIndex < MLM_RANKS.length - 1) {
+      actualNextRank = MLM_RANKS[currentRankIndex + 1];
+    }
     console.log('[RANK-REWARDS] actualNextRank:', actualNextRank)
     
     // Вычисляем общую сумму заклеймленных денежных наград

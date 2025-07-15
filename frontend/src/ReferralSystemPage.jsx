@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Copy } from 'lucide-react';
 
 const Card = ({ children, className = "" }) => (
@@ -134,6 +134,9 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
   const [currentRankData, setCurrentRankData] = useState(null);
   const [progressPercentage, setProgressPercentage] = useState(0);
   const [remainingTurnover, setRemainingTurnover] = useState(0);
+  
+  // Добавляем ref для отслеживания обновлений
+  const remainingTurnoverRef = useRef(0);
 
   useEffect(() => {
     const fetchRankData = async () => {
@@ -150,19 +153,24 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
         
         // Используем данные из API вместо локального массива
         const currentRankData = data.currentRank || { level: 1, turnover: 0 };
-        const nextRankData = data.nextRank || { level: 1, turnover: 100000000 };
+        const nextRankData = data.nextRank;
         
         setCurrentRankData(currentRankData);
         setNextRankData(nextRankData);
         
-        // Вычисляем прогресс (как в Rank Rewards System)
-        const remainingTurnover = Math.max(0, nextRankData.turnover - (data.turnover || 0));
-        
-        // Расчет процента выполнения (правильная логика)
-        const progressPercentage = Math.min(100, Math.max(0, Math.round(((data.turnover || 0) / nextRankData.turnover) * 100)));
-        
-        setRemainingTurnover(remainingTurnover);
-        setProgressPercentage(progressPercentage);
+        // Вычисляем прогресс
+        if (nextRankData) {
+          const calculatedRemainingTurnover = Math.max(0, nextRankData.turnover - (data.turnover || 0));
+          const calculatedProgressPercentage = Math.min(100, Math.max(0, Math.round(((data.turnover || 0) / nextRankData.turnover) * 100)));
+          
+          remainingTurnoverRef.current = calculatedRemainingTurnover;
+          setRemainingTurnover(calculatedRemainingTurnover);
+          setProgressPercentage(calculatedProgressPercentage);
+        } else {
+          // Достигнут максимальный ранг (уровень 20)
+          setRemainingTurnover(0);
+          setProgressPercentage(100);
+        }
       } catch (error) {
         console.error('Error fetching rank data:', error);
         // Set default values on error
@@ -182,6 +190,8 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
   const totalTeam = getTotalTeam(referralTree);
   const teamTurnover = getTeamTurnover(referralTree);
   
+
+  
   // Базовые вычисления
   const personalInvested = transactions.filter(t => t.type === 'INVESTMENT').reduce((a, b) => a + b.amount, 0);
   const requiredPersonal = 100;
@@ -189,13 +199,7 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
   const yourSales = commissions[1];
   const teamSales = commissions.slice(2).reduce((a, b) => a + b, 0);
   
-  // Добавим отладку для понимания проблемы
-  console.log('Transactions:', transactions);
-  console.log('ReferralTree:', referralTree);
-  console.log('Commissions:', commissions);
-  console.log('Direct referrals:', directReferrals);
-  console.log('Total team:', totalTeam);
-  console.log('Team turnover:', teamTurnover);
+
   
 
 
@@ -241,9 +245,11 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
       <Card>
         <div className="text-2xl font-bold text-white mb-4">Team turnover</div>
         <div className="text-gray-400 text-sm">Total team turnover</div>
-        <div className="text-white mb-2">${teamTurnover.toFixed(2)}</div>
+        <div className="text-white mb-2">${openLinesTournover.toLocaleString()}</div>
         <div className="text-gray-400 text-sm">Required for next level</div>
-        <div className="text-white">${remainingTurnover.toLocaleString()}</div>
+        <div className="text-white">
+          {nextRankData ? `$${remainingTurnover.toLocaleString()}` : 'Max rank reached'}
+        </div>
       </Card>
       {/* 4.2 Your team */}
       <Card>
@@ -273,16 +279,34 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
       {/* 4.4 Your profile */}
       <Card>
         <div className="text-2xl font-bold text-white mb-4">Your profile</div>
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center text-xl text-white">{userData.name?.[0] || 'U'}</div>
-          <div>
-            <div className="text-white">{userData.name}</div>
+        <div className="mb-4 flex items-center gap-4">
+          <div className="relative">
+            {userData.avatar ? (
+              <img 
+                src={userData.avatar} 
+                alt="Avatar" 
+                className="w-16 h-16 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-xl bg-gray-700 flex items-center justify-center text-2xl text-white">
+                {userData.username?.[0] || userData.name?.[0] || 'U'}
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="text-lg font-semibold text-white">{userData.username || userData.name}</div>
+            <div className="text-gray-400 text-sm">{userData.email}</div>
             <div className="text-orange-400 text-sm">Rank {actualRank}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg p-2">
-          <span className="text-gray-300 text-sm flex-1 truncate">{referralLink}</span>
-          <button className="text-orange-400 hover:text-orange-300 glass-button p-1 rounded" onClick={() => {navigator.clipboard.writeText(referralLink);}}><Copy size={16} /></button>
+        <div className="space-y-3">
+          <div>
+            <div className="text-[rgb(249,115,22)] text-sm mb-1">Referral link</div>
+            <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg p-2">
+              <span className="text-gray-300 text-sm flex-1 truncate">{referralLink}</span>
+              <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
+            </div>
+          </div>
         </div>
       </Card>
       {/* 4.5 Personal investment */}
@@ -307,27 +331,28 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
           <span>Progress to next rank</span>
           <span>{progressPercentage}%</span>
         </div>
-        <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+        <div className="w-full bg-gray-700 rounded-full h-2">
           <div 
             className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full transition-all duration-300"
             style={{ width: `${Math.min(progressPercentage, 100)}%` }}
           ></div>
         </div>
         <div className="text-xs text-gray-500 mt-1">
-          ${openLinesTournover.toLocaleString()} / ${nextRankData?.turnover.toLocaleString()}
-        </div>
-        <div className="flex justify-between text-sm mt-2">
-          <div className="text-gray-400">
-            Current Rank: <span className="text-orange-400">Rank {actualRank}</span>
-          </div>
-          <div className="text-gray-400">
-            Next Rank: <span className="text-orange-400">Rank {actualRank + 1}</span>
-          </div>
+          {nextRankData
+            ? `$${openLinesTournover.toLocaleString()} / $${nextRankData.turnover.toLocaleString()}`
+            : <span className="text-green-400">Maximum rank achieved! 🎉</span>
+          }
         </div>
         <div className="text-center mt-2 text-sm">
           <span className="text-gray-400">
-            ${remainingTurnover.toLocaleString()} more needed for next rank
-            <span className="text-orange-400 ml-2">({progressPercentage}% complete)</span>
+            {nextRankData ? (
+              <>
+                ${remainingTurnover.toLocaleString()} more needed for next rank
+                <span className="text-orange-400 ml-2">({progressPercentage}% complete)</span>
+              </>
+            ) : (
+              <span className="text-green-400">Maximum rank achieved! 🎉</span>
+            )}
           </span>
         </div>
       </Card>

@@ -26,7 +26,7 @@ export default function InvestmentPackagesPage({ userData, packages, onInvest, l
             <form onSubmit={e => {e.preventDefault(); onInvest(selectedPackage);}} className="space-y-4">
               <input type="number" min={selectedPackage.minAmount || 1} value={purchaseAmount} onChange={e => setPurchaseAmount(e.target.value)} className="w-full glass-input px-4 py-3 text-white focus:outline-none" placeholder={`Min: $${selectedPackage.minAmount || 1}`} required />
               <button type="submit" className="w-full orange-button text-white py-3 rounded-lg" disabled={loading}>Invest</button>
-              <button type="button" onClick={() => {setSelectedPackage(null); setPurchaseAmount(''); setBonus(null);}} className="w-full glass-button text-white py-2 rounded-lg mt-2">Cancel</button>
+              <button type="button" onClick={() => {setSelectedPackage(null); setPurchaseAmount(''); setBonus(null);}} className="w-full glass-button text-white py-2 rounded-lg">Cancel</button>
               {bonus && <div className="text-green-400 text-sm mt-2">Bonus for period: ${bonus}</div>}
             </form>
           </div>

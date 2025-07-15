@@ -125,10 +125,12 @@ class RankRewardService {
 
   // Получить прогресс до следующего ранга
   getNextRank(turnover) {
+    // Находим следующий ранг (первый ранг, который требует больше turnover)
     for (const rank of MLM_RANKS) {
       if (turnover < rank.turnover) return rank
     }
-    return null // Достигнут максимальный ранг
+    // Если turnover больше или равен всем рангам, значит достигнут максимальный ранг
+    return null
   }
 
   // Получить историю клеймов наград

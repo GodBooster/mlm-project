@@ -44,6 +44,7 @@ const InvestorDashboard = () => {
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
+    if (!Array.isArray(transactions)) return 0;
     return transactions.filter(t => t.type === 'WITHDRAWAL' && t.status === 'PENDING')
       .reduce((sum, t) => sum + Number(t.amount), 0);
   }, [transactions]);
@@ -61,6 +62,7 @@ const InvestorDashboard = () => {
   }, [rankData, currentRank]);
 
   const onHold = useMemo(() => {
+    if (!Array.isArray(transactions) || !Array.isArray(packages)) return 0;
     const active = transactions.filter(t => t.type === 'Investment' && t.status === 'Active');
     let sum = 0;
     active.forEach(inv => {
@@ -130,11 +132,13 @@ const InvestorDashboard = () => {
   }, [userData?.investments]);
 
   const incomeFromPackages = useMemo(() => {
+    if (!Array.isArray(transactions)) return 0;
     return transactions.filter(t => t.type === 'BONUS' || t.type === 'DAILY_PROFIT')
       .reduce((sum, t) => sum + Number(t.amount), 0);
   }, [transactions]);
 
   const incomeFromPartnership = useMemo(() => {
+    if (!Array.isArray(transactions)) return 0;
     return transactions.filter(t => t.type === 'RANK_REWARD' || t.type === 'REFERRAL_BONUS')
       .reduce((sum, t) => sum + Number(t.amount), 0);
   }, [transactions]);
@@ -213,6 +217,16 @@ const InvestorDashboard = () => {
           fetch(`${API}/api/referral-stats`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
+        // Check if any response is not ok
+        if (!profileRes.ok || !transactionsRes.ok || !packagesRes.ok || !referralLinkRes.ok || !statsRes.ok) {
+          // If any request failed, clear token and redirect to login
+          console.log('One or more API requests failed, redirecting to login');
+          setToken('');
+          localStorage.removeItem('token');
+          setCurrentPage('login');
+          return;
+        }
+
         const [profileData, transactionsData, packagesData, referralLinkData, statsData] = await Promise.all([
           profileRes.json(),
           transactionsRes.json(),
@@ -221,11 +235,27 @@ const InvestorDashboard = () => {
           statsRes.json()
         ]);
 
+        // Check if any data contains error
+        if (profileData.error || transactionsData.error || packagesData.error || referralLinkData.error || statsData.error) {
+          console.log('API returned error, redirecting to login');
+          setToken('');
+          localStorage.removeItem('token');
+          setCurrentPage('login');
+          return;
+        }
+
         // Load referral tree after we have profile data
-        const referralsRes = await fetch(`${API}/api/referrals/tree/${profileData.id}`, { 
-          headers: { Authorization: `Bearer ${token}` } 
-        });
-        const referralsData = await referralsRes.json();
+        let referralsData = null;
+        try {
+          const referralsRes = await fetch(`${API}/api/referrals/tree/${profileData.id}`, { 
+            headers: { Authorization: `Bearer ${token}` } 
+          });
+          if (referralsRes.ok) {
+            referralsData = await referralsRes.json();
+          }
+        } catch (error) {
+          console.error('Error loading referral tree:', error);
+        }
 
         // Load rank data
         let rankData = { currentRank: { level: 1 } };
@@ -233,7 +263,9 @@ const InvestorDashboard = () => {
           const rankRes = await fetch(`${API}/api/rank-rewards`, { 
             headers: { Authorization: `Bearer ${token}` } 
           });
-          rankData = await rankRes.json();
+          if (rankRes.ok) {
+            rankData = await rankRes.json();
+          }
         } catch (error) {
           console.error('Error loading rank data:', error);
         }
@@ -247,9 +279,9 @@ const InvestorDashboard = () => {
         });
         
         setUserData(profileData);
-        setTransactions(transactionsData);
-        setPackages(packagesData);
-        setReferralLink(referralLinkData.link);
+        setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
+        setPackages(Array.isArray(packagesData) ? packagesData : []);
+        setReferralLink(referralLinkData.link || '');
         setReferralTree(referralsData);
         setSponsor(statsData.sponsor || null);
         setTableView(statsData.tableView || []);
@@ -257,6 +289,10 @@ const InvestorDashboard = () => {
         setRankData(rankData); // Set rankData for progress bar
       } catch (error) {
         console.error('Error loading data:', error);
+        // On any error, redirect to login
+        setToken('');
+        localStorage.removeItem('token');
+        setCurrentPage('login');
       }
     };
 
