@@ -45,7 +45,7 @@ class ReferralService {
     // Update new user with referrer
     await prisma.user.update({
       where: { id: newUserId },
-      data: { referredBy: referrer.id }
+      data: { referredBy: referrer.referralCode } // исправлено: теперь строка
     })
 
     // Calculate and publish referral bonus
