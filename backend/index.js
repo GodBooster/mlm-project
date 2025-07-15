@@ -77,14 +77,16 @@ async function sendVerificationEmail(to, code) {
   });
 
   const html = `
+  <!DOCTYPE html>
   <html>
-    <body style="background: #18181b; padding: 0; margin: 0; font-family: 'Segoe UI', Arial, sans-serif;">
-      <div style="max-width: 420px; margin: 40px auto; background: rgba(30, 41, 59, 0.95); border-radius: 18px; box-shadow: 0 4px 32px #0005; padding: 36px 32px;">
+    <body style="background: #18181b; margin: 0; padding: 0;">
+      <div style="max-width: 420px; margin: 40px auto; background: rgba(30,41,59,0.95); border-radius: 18px; box-shadow: 0 4px 32px #0005; padding: 36px 32px; font-family: 'Segoe UI', Arial, sans-serif;">
         <div style="text-align: center; margin-bottom: 24px;">
+          <!-- Логотип проекта (замени src на ссылку на свой логотип, если есть) -->
           <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: linear-gradient(135deg, #f97316 60%, #ef4444 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center;">
-            <span style="font-size: 2.2em; color: #fff; font-weight: bold;">M</span>
+            <img src='https://invarifi.tech/favicon.ico' alt='Logo' style='width: 36px; height: 36px; border-radius: 8px; background: #fff;' onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-size:2.2em;color:#fff;font-weight:bold;\'>M</span>'">
           </div>
-          <h2 style="color: #f97316; margin: 0 0 8px; font-size: 1.6em; font-weight: 700; letter-spacing: 1px;">Welcome to MLM!</h2>
+          <h2 style="color: #f97316; margin: 0 0 8px; font-size: 1.6em; font-weight: 700; letter-spacing: 1px;">Welcome to MLM Project Transgresse!</h2>
         </div>
         <p style="color: #fff; font-size: 1.1em; margin-bottom: 18px;">Thank you for registering on our platform.</p>
         <p style="color: #fff; margin-bottom: 18px;">To confirm your email, please enter this code:</p>
@@ -93,7 +95,7 @@ async function sendVerificationEmail(to, code) {
         </div>
         <p style="color: #aaa; font-size: 1em; margin-bottom: 0;">If you did not register on our site, simply ignore this email.</p>
         <hr style="border: none; border-top: 1px solid #333; margin: 32px 0 16px;">
-        <p style="color: #888; font-size: 0.95em; text-align: center; margin: 0;">Best regards,<br>MLM Team</p>
+        <p style="color: #888; font-size: 0.95em; text-align: center; margin: 0;">Best regards,<br>MLM Project Transgresse Team</p>
       </div>
     </body>
   </html>
