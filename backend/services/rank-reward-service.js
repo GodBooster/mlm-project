@@ -116,6 +116,15 @@ class RankRewardService {
 
   // Получить текущий ранг пользователя
   getUserRank(turnover) {
+    if (turnover === 0) {
+      return {
+        level: 0,
+        name: 'No rank',
+        turnover: 0,
+        reward: 0,
+        prize: null
+      }
+    }
     let current = MLM_RANKS[0]
     for (const rank of MLM_RANKS) {
       if (turnover >= rank.turnover) current = rank
@@ -125,6 +134,9 @@ class RankRewardService {
 
   // Получить прогресс до следующего ранга
   getNextRank(turnover) {
+    if (turnover === 0) {
+      return MLM_RANKS[0]
+    }
     // Находим следующий ранг (первый ранг, который требует больше turnover)
     for (const rank of MLM_RANKS) {
       if (turnover < rank.turnover) return rank
