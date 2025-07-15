@@ -149,12 +149,10 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
         const data = await res.json();
         
         setOpenLinesTournover(data.turnover || 0);
-        setActualRank(data.currentRank?.level || 1);
-        
+        setActualRank(data.currentRank?.level ?? 0); // Было: || 1, стало: ?? 0
         // Используем данные из API вместо локального массива
-        const currentRankData = data.currentRank || { level: 1, turnover: 0 };
+        const currentRankData = data.currentRank || { level: 0, name: 'No rank', turnover: 0 };
         const nextRankData = data.nextRank;
-        
         setCurrentRankData(currentRankData);
         setNextRankData(nextRankData);
         
@@ -175,9 +173,9 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
         console.error('Error fetching rank data:', error);
         // Set default values on error
         setOpenLinesTournover(0);
-        setActualRank(1);
-        setCurrentRankData(RANKS[0]);
-        setNextRankData(RANKS[1] || RANKS[0]);
+        setActualRank(0); // Было: 1, стало: 0
+        setCurrentRankData({ level: 0, name: 'No rank', turnover: 0 });
+        setNextRankData(null);
         setRemainingTurnover(0);
         setProgressPercentage(0);
       }
@@ -296,7 +294,9 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
           <div className="flex-1">
             <div className="text-lg font-semibold text-white">{userData.username || userData.name}</div>
             <div className="text-gray-400 text-sm">{userData.email}</div>
-            <div className="text-orange-400 text-sm">Rank {actualRank}</div>
+            <div className="text-orange-400 text-sm">
+              {actualRank === 0 ? 'No rank' : `Rank ${actualRank}`}
+            </div>
           </div>
         </div>
         <div className="space-y-3">
