@@ -30,7 +30,21 @@ const upload = multer({
 })
 
 // Middleware
-app.use(cors())
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://invarifi.netlify.app',
+    'https://transgresse.netlify.app',
+    'https://invarifi.tech',
+    'https://www.invarifi.tech',
+    // Добавьте сюда ваш Netlify домен, если он отличается
+    process.env.FRONTEND_URL
+  ].filter(Boolean), // Убираем undefined значения
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}))
 app.use(express.json())
 
 // Start scheduler (no queue manager needed)
