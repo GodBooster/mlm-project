@@ -43,7 +43,7 @@ GRANT ALL PRIVILEGES ON DATABASE mlm_database TO mlm_user;
 3. **Создайте файл .env:**
 ```bash
 DATABASE_URL="postgresql://mlm_user:mlm_password@localhost:5432/mlm_database"
-PORT=3001
+PORT=3000
 ```
 
 4. **Выполните миграции:**
