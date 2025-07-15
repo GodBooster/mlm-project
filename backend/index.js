@@ -300,9 +300,9 @@ async function sendVerificationEmail(to, code) {
               </div>
               <p class="instruction">
                   Enter this code on the verification page to activate your account.
-                  <br><strong>The code is valid for 15 minutes.</strong>
+                  <br><strong>The code is valid for 1 minute.</strong>
               </p>
-              <a href="https://invarifi.tech" class="cta-button">Verify Account</a>
+              <a href="https://api.invarifi.tech" class="cta-button">Verify Account</a>
               <div class="divider"></div>
               <div class="security-info">
                   <h3>🔒 Security Questions?</h3>
@@ -321,7 +321,7 @@ async function sendVerificationEmail(to, code) {
               </p>
               <p>
                   If you have any questions, contact us: 
-                  <a href="mailto:support@invarifi.tech">support@invarifi.tech</a>
+                  <a href="mailto:support@mlm.transgresse.com">support@mlm.transgresse.com</a>
               </p>
               <p>
                   <a href="#">Unsubscribe</a> | 
@@ -335,11 +335,11 @@ async function sendVerificationEmail(to, code) {
   `;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || 'Invarifi <no-reply@invarifi.tech>',
+    from: process.env.SMTP_FROM || 'MLM Transgresse <no-reply@mlm.transgresse.com>',
     to,
-    subject: 'Email Verification — Invarifi',
+    subject: 'Email Verification — MLM Transgresse',
     html,
-    text: `Thank you for registering on Invarifi!\n\nTo verify your email, use this code: ${code}\n\nIf you did not register, simply ignore this email.\n\nBest regards,\nThe Invarifi Team`,
+    text: `Thank you for registering on MLM Transgresse!\n\nTo verify your email, use this code: ${code}\n\nIf you did not register, simply ignore this email.\n\nBest regards,\nThe MLM Transgresse Team`,
   };
 
   // Отправка письма
