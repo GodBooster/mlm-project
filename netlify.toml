@@ -2,6 +2,9 @@
   command = "npm run build --prefix frontend"
   publish = "frontend/dist"
 
+[build.environment]
+  NODE_VERSION = "18"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
