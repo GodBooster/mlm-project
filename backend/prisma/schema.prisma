@@ -26,6 +26,10 @@ model User {
   transactions Transaction[]
   referrer     User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
   referrals    User[]        @relation("ReferralRelation")
+  // --- Email verification fields ---
+  emailVerified           Boolean     @default(false)
+  emailVerificationToken  String?
+  emailVerificationExpires DateTime?
 }
 
 model InvestmentPackage {

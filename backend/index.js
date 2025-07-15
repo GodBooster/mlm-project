@@ -559,6 +559,37 @@ app.post('/api/verify-email', async (req, res) => {
   }
 })
 
+app.get('/api/verify-email', async (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { gte: new Date() },
+      },
+    });
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired token' });
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+    // Редирект на красивую страницу фронта
+    return res.redirect('https://transgresse.netlify.app/email-verified');
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
