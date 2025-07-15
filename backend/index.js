@@ -859,17 +859,22 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
     const currentRank = rankRewardService.getUserRank(turnover)
     console.log('[RANK-REWARDS] currentRank:', currentRank)
     
-    const nextRank = rankRewardService.getNextRank(turnover)
+    let nextRank = rankRewardService.getNextRank(turnover)
     console.log('[RANK-REWARDS] nextRank:', nextRank)
     
     const claimed = await rankRewardService.getClaimedRewards(userId)
     console.log('[RANK-REWARDS] claimed:', claimed)
     
-    // nextRank всегда следующий ранг, кроме максимального
-    const currentRankIndex = MLM_RANKS.findIndex(r => r.level === currentRank.level);
+    // Исправление: если оборот = 0, nextRank всегда первый ранг
     let actualNextRank = null;
-    if (currentRankIndex < MLM_RANKS.length - 1) {
-      actualNextRank = MLM_RANKS[currentRankIndex + 1];
+    if (turnover === 0) {
+      actualNextRank = MLM_RANKS[0];
+    } else {
+      // nextRank всегда следующий ранг, кроме максимального
+      const currentRankIndex = MLM_RANKS.findIndex(r => r.level === currentRank.level);
+      if (currentRankIndex < MLM_RANKS.length - 1) {
+        actualNextRank = MLM_RANKS[currentRankIndex + 1];
+      }
     }
     console.log('[RANK-REWARDS] actualNextRank:', actualNextRank)
     
