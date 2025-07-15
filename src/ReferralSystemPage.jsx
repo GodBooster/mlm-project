@@ -333,10 +333,10 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
         </div>
         <div className="flex justify-between items-center mb-1">
           <span className="text-xs text-orange-400 font-semibold">
-            {currentRankData?.level === 0 ? 'No rank' : `Rank ${currentRankData?.level || ''}${currentRankData?.name ? ` (${currentRankData.name})` : ''}`}
+            {currentRankData?.level === 0 ? 'No rank' : `Rank ${currentRankData?.level || ''}`}
           </span>
           <span className="text-xs text-orange-400 font-semibold">
-            {nextRankData ? `Rank ${nextRankData.level}${nextRankData.name ? ` (${nextRankData.name})` : ''}` : 'Max rank'}
+            {nextRankData ? `Rank ${nextRankData.level}` : 'Max rank'}
           </span>
         </div>
         <div className="w-full bg-gray-700 rounded-full h-2">
