@@ -347,6 +347,7 @@ async function sendVerificationEmail(to, code, token) {
   // Отправка письма
   try {
     await transporter.sendMail(mailOptions);
+    console.log('[EMAIL] Verification email sent to', email, 'token:', token)
     console.log(`[EMAIL] Verification email sent to ${to}`);
   } catch (e) {
     console.error('[EMAIL] Failed to send verification email:', e);
