@@ -8,7 +8,7 @@ import RankRewardsPage from './RankRewardsPage';
 
 
 
-const API = import.meta.env.VITE_API_BASE_URL;
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const InvestorDashboard = () => {
   // --- Hooks (only at the beginning) ---

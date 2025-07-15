@@ -7,7 +7,7 @@ const Card = ({ children, className = "" }) => (
   <div className={`bg-gray-900 shadow-lg rounded-2xl p-6 mb-6 ${className}`}>{children}</div>
 );
 
-const API = import.meta.env.VITE_API_BASE_URL;
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('overview');
