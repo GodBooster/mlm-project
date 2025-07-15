@@ -116,28 +116,20 @@ class RankRewardService {
 
   // Получить текущий ранг пользователя
   getUserRank(turnover) {
-    if (turnover === 0) {
+    if (!turnover || turnover < 10000) {
       return {
         level: 0,
         name: 'No rank',
         turnover: 0,
-        reward: 0,
         prize: null
       }
     }
-    // Если оборот > 0, ищем максимальный подходящий ранг
+    // Если оборот >= 10000, ищем максимальный подходящий ранг
     let current = null;
     for (const rank of MLM_RANKS) {
       if (turnover >= rank.turnover) current = rank;
     }
-    // Если не найдено ни одного ранга (теоретически невозможно), вернуть 'No rank'
-    return current || {
-      level: 0,
-      name: 'No rank',
-      turnover: 0,
-      reward: 0,
-      prize: null
-    };
+    return current;
   }
 
   // Получить прогресс до следующего ранга
