@@ -12,7 +12,12 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const InvestorDashboard = () => {
   // --- Hooks (only at the beginning) ---
-  const [currentPage, setCurrentPage] = useState('login');
+  // Восстанавливаем currentPage из localStorage, если есть
+  const getInitialPage = () => {
+    const saved = localStorage.getItem('currentPage');
+    return saved || 'login';
+  };
+  const [currentPage, setCurrentPage] = useState(getInitialPage());
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -41,6 +46,7 @@ const InvestorDashboard = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
@@ -56,10 +62,18 @@ const InvestorDashboard = () => {
 
   // Get next rank data
   const nextRankData = useMemo(() => {
-    if (!rankData?.ranks) return null;
-    const nextRank = rankData.ranks.find(r => r.level === currentRank + 1);
-    return nextRank || null;
-  }, [rankData, currentRank]);
+    if (!rankData) return null;
+    // Если currentRank = 0 (No rank), nextRank = rankData.nextRank (Bronze)
+    if (rankData.currentRank?.level === 0 && rankData.nextRank) {
+      return rankData.nextRank;
+    }
+    // Обычная логика для пользователей с рангом
+    if (rankData.ranks && rankData.currentRank?.level) {
+      const nextRank = rankData.ranks.find(r => r.level === rankData.currentRank.level + 1);
+      return nextRank || null;
+    }
+    return null;
+  }, [rankData]);
 
   const onHold = useMemo(() => {
     if (!Array.isArray(transactions) || !Array.isArray(packages)) return 0;
@@ -159,6 +173,7 @@ const InvestorDashboard = () => {
         localStorage.setItem('token', data.token);
         setUserData(data.user);
         setCurrentPage('dashboard');
+        localStorage.setItem('currentPage', 'dashboard');
       } else {
         setAuthError(data.error || 'Login error');
       }
@@ -186,6 +201,7 @@ const InvestorDashboard = () => {
         localStorage.setItem('token', data.token);
         setUserData(data.user);
         setCurrentPage('dashboard');
+        localStorage.setItem('currentPage', 'dashboard');
         if (refId) localStorage.removeItem('referrerId');
       } else {
         setAuthError(data.error || 'Registration error');
@@ -201,103 +217,128 @@ const InvestorDashboard = () => {
     localStorage.removeItem('token');
     setUserData(null);
     setCurrentPage('login');
+    localStorage.removeItem('currentPage');
   }, []);
 
   // --- LOAD DATA ---
-  useEffect(() => {
-    if (!token) return;
-    
-    const loadData = async () => {
-      try {
-        const [profileRes, transactionsRes, packagesRes, referralLinkRes, statsRes] = await Promise.all([
-          fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/api/packages`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/api/referral-link`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/api/referral-stats`, { headers: { Authorization: `Bearer ${token}` } })
-        ]);
+  const loadData = async () => {
+    try {
+      const [profileRes, transactionsRes, packagesRes, referralLinkRes, statsRes] = await Promise.all([
+        fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/packages`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/referral-link`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/referral-stats`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
 
-        // Check if any response is not ok
-        if (!profileRes.ok || !transactionsRes.ok || !packagesRes.ok || !referralLinkRes.ok || !statsRes.ok) {
-          // If any request failed, clear token and redirect to login
-          console.log('One or more API requests failed, redirecting to login');
-          setToken('');
-          localStorage.removeItem('token');
-          setCurrentPage('login');
-          return;
-        }
-
-        const [profileData, transactionsData, packagesData, referralLinkData, statsData] = await Promise.all([
-          profileRes.json(),
-          transactionsRes.json(),
-          packagesRes.json(),
-          referralLinkRes.json(),
-          statsRes.json()
-        ]);
-
-        // Check if any data contains error
-        if (profileData.error || transactionsData.error || packagesData.error || referralLinkData.error || statsData.error) {
-          console.log('API returned error, redirecting to login');
-          setToken('');
-          localStorage.removeItem('token');
-          setCurrentPage('login');
-          return;
-        }
-
-        // Load referral tree after we have profile data
-        let referralsData = null;
-        try {
-          const referralsRes = await fetch(`${API}/api/referrals/tree/${profileData.id}`, { 
-            headers: { Authorization: `Bearer ${token}` } 
-          });
-          if (referralsRes.ok) {
-            referralsData = await referralsRes.json();
-          }
-        } catch (error) {
-          console.error('Error loading referral tree:', error);
-        }
-
-        // Load rank data
-        let rankData = { currentRank: { level: 1 } };
-        try {
-          const rankRes = await fetch(`${API}/api/rank-rewards`, { 
-            headers: { Authorization: `Bearer ${token}` } 
-          });
-          if (rankRes.ok) {
-            rankData = await rankRes.json();
-          }
-        } catch (error) {
-          console.error('Error loading rank data:', error);
-        }
-
-        console.log('Setting data:', {
-          profileData,
-          referralsData,
-          statsData,
-          transactionsData,
-          rankData
-        });
-        
-        setUserData(profileData);
-        setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
-        setPackages(Array.isArray(packagesData) ? packagesData : []);
-        setReferralLink(referralLinkData.link || '');
-        setReferralTree(referralsData);
-        setSponsor(statsData.sponsor || null);
-        setTableView(statsData.tableView || []);
-        setCurrentRank(rankData.currentRank?.level || 1);
-        setRankData(rankData); // Set rankData for progress bar
-      } catch (error) {
-        console.error('Error loading data:', error);
-        // On any error, redirect to login
+      // Check if any response is not ok
+      if (!profileRes.ok || !transactionsRes.ok || !packagesRes.ok || !referralLinkRes.ok || !statsRes.ok) {
+        // If any request failed, clear token and redirect to login
+        console.log('One or more API requests failed, redirecting to login');
         setToken('');
         localStorage.removeItem('token');
         setCurrentPage('login');
+        return;
       }
-    };
 
-    loadData();
+      const [profileData, transactionsData, packagesData, referralLinkData, statsData] = await Promise.all([
+        profileRes.json(),
+        transactionsRes.json(),
+        packagesRes.json(),
+        referralLinkRes.json(),
+        statsRes.json()
+      ]);
+
+      // Check if any data contains error
+      if (profileData.error || transactionsData.error || packagesData.error || referralLinkData.error || statsData.error) {
+        console.log('API returned error, redirecting to login');
+        setToken('');
+        localStorage.removeItem('token');
+        setCurrentPage('login');
+        return;
+      }
+
+      // Load referral tree after we have profile data
+      let referralsData = null;
+      try {
+        const referralsRes = await fetch(`${API}/api/referrals/tree/${profileData.id}`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        if (referralsRes.ok) {
+          referralsData = await referralsRes.json();
+        }
+      } catch (error) {
+        console.error('Error loading referral tree:', error);
+      }
+
+      // Load rank data
+      let rankData = { currentRank: { level: 1 } };
+      try {
+        const rankRes = await fetch(`${API}/api/rank-rewards`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        if (rankRes.ok) {
+          rankData = await rankRes.json();
+        }
+      } catch (error) {
+        console.error('Error loading rank data:', error);
+      }
+
+      console.log('Setting data:', {
+        profileData,
+        referralsData,
+        statsData,
+        transactionsData,
+        rankData
+      });
+      
+      setUserData(profileData);
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
+      setPackages(Array.isArray(packagesData) ? packagesData : []);
+      setReferralLink(referralLinkData.link || '');
+      setReferralTree(referralsData);
+      setSponsor(statsData.sponsor || null);
+      setTableView(statsData.tableView || []);
+      setCurrentRank(rankData.currentRank?.level || 1);
+      setRankData(rankData); // Set rankData for progress bar
+    } catch (error) {
+      console.error('Error loading data:', error);
+      // On any error, redirect to login
+      setToken('');
+      localStorage.removeItem('token');
+      setCurrentPage('login');
+    }
+  };
+
+  useEffect(() => {
+    let timeoutId;
+    if (token) {
+      loadData()
+        .catch((e) => {
+          console.error('loadData error', e);
+        })
+        .finally(() => {
+          console.log('setIsAuthLoading(false) after loadData');
+          setIsAuthLoading(false);
+        });
+      // Фолбек: даже если loadData зависнет, через 3 сек снимаем загрузку
+      timeoutId = setTimeout(() => {
+        setIsAuthLoading(false);
+        console.log('setIsAuthLoading(false) by timeout');
+      }, 3000);
+    } else {
+      setIsAuthLoading(false);
+      console.log('setIsAuthLoading(false) no token');
+    }
+    return () => clearTimeout(timeoutId);
   }, [token]);
+
+  // Сохраняем currentPage в localStorage при изменении
+  useEffect(() => {
+    if (currentPage && currentPage !== 'login') {
+      localStorage.setItem('currentPage', currentPage);
+    }
+  }, [currentPage]);
 
   // Note: Referral handling is now done in LoginPage component
 
@@ -506,6 +547,9 @@ const InvestorDashboard = () => {
   const logoutButton = { id: 'logout', icon: LogOut, label: 'Logout' };
 
   // --- Main Render ---
+  if (isAuthLoading) {
+    return <div />; // Можно заменить на спиннер
+  }
   if (!token || !userData) {
     return <LoginPage onLogin={handleLogin} onRegister={handleRegister} loading={loading} authError={authError} />;
   }

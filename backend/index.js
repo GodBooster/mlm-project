@@ -9,6 +9,7 @@ import referralService from './services/referral-service.js'
 import rankService from './services/rank-service.js'
 import rankRewardService, { MLM_RANKS } from './services/rank-reward-service.js'
 import { authenticateToken, generateToken } from './middleware/auth.js'
+import nodemailer from 'nodemailer';
 
 const prisma = new PrismaClient()
 const app = express()
@@ -62,6 +63,61 @@ app.get('/invite/:code', (req, res) => {
   res.redirect(`${frontendUrl}/invite/${code}`);
 })
 
+// Email sending utility
+async function sendVerificationEmail(to, code) {
+  // Настройка транспорта (пример для Gmail, заменить на свой SMTP)
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465,
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER || 'your@email.com',
+      pass: process.env.SMTP_PASS || 'yourpassword',
+    },
+  });
+
+  const html = `
+  <html>
+    <body style="background: #18181b; padding: 0; margin: 0; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 420px; margin: 40px auto; background: rgba(30, 41, 59, 0.95); border-radius: 18px; box-shadow: 0 4px 32px #0005; padding: 36px 32px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: linear-gradient(135deg, #f97316 60%, #ef4444 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 2.2em; color: #fff; font-weight: bold;">M</span>
+          </div>
+          <h2 style="color: #f97316; margin: 0 0 8px; font-size: 1.6em; font-weight: 700; letter-spacing: 1px;">Welcome to MLM!</h2>
+        </div>
+        <p style="color: #fff; font-size: 1.1em; margin-bottom: 18px;">Thank you for registering on our platform.</p>
+        <p style="color: #fff; margin-bottom: 18px;">To confirm your email, please enter this code:</p>
+        <div style="background: rgba(249,115,22,0.12); border-radius: 12px; padding: 18px 0; text-align: center; margin: 24px 0;">
+          <span style="font-size: 2.2em; font-weight: bold; letter-spacing: 8px; color: #f97316;">${code}</span>
+        </div>
+        <p style="color: #aaa; font-size: 1em; margin-bottom: 0;">If you did not register on our site, simply ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #333; margin: 32px 0 16px;">
+        <p style="color: #888; font-size: 0.95em; text-align: center; margin: 0;">Best regards,<br>MLM Team</p>
+      </div>
+    </body>
+  </html>
+  `;
+
+  const mailOptions = {
+    from: process.env.SMTP_FROM || 'MLM <no-reply@mlm.com>',
+    to,
+    subject: 'Email Verification - MLM Platform',
+    html,
+    text: `Welcome to MLM!\n\nThank you for registering on our platform.\n\nTo confirm your email, please enter this code: ${code}\n\nIf you did not register on our site, simply ignore this email.\n\nBest regards,\nMLM Team`,
+  };
+
+  // Отправка письма
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`[EMAIL] Verification email sent to ${to}`);
+  } catch (e) {
+    console.error('[EMAIL] Failed to send verification email:', e);
+    // Для теста — просто выводим письмо в консоль
+    console.log('[EMAIL] MOCK EMAIL TO:', to, '\nSUBJECT:', mailOptions.subject, '\nBODY:', code);
+  }
+}
+
 // Authentication routes
 app.post('/api/register', async (req, res) => {
   try {
@@ -86,7 +142,6 @@ app.post('/api/register', async (req, res) => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
     
     // Store verification code temporarily (in production, use Redis or database)
-    // For now, we'll store it in memory (not recommended for production)
     if (!global.verificationCodes) global.verificationCodes = new Map()
     global.verificationCodes.set(email, {
       code: verificationCode,
@@ -94,16 +149,13 @@ app.post('/api/register', async (req, res) => {
       userData: { email, name: userName, password, referralId }
     })
 
-    // In production, send email with verification code
-    console.log(`Verification code for ${email}: ${verificationCode}`)
+    // Отправляем письмо с кодом
+    await sendVerificationEmail(email, verificationCode)
 
-    res.json({ 
-      success: true, 
-      message: 'Verification code sent to your email' 
-    })
+    res.json({ success: true, message: 'Verification code sent to your email' })
   } catch (error) {
     console.error('Registration error:', error)
-    res.status(500).json({ error: 'Registration failed' })
+    res.status(500).json({ error: 'Failed to register user' })
   }
 })
 
@@ -853,9 +905,11 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
     const userId = req.user.id
     console.log('[RANK-REWARDS] userId:', userId)
     
+    // Только вычисляем оборот по рефералам
     const turnover = await rankRewardService.getUserTurnover(userId)
     console.log('[RANK-REWARDS] turnover:', turnover)
     
+    // currentRank только по обороту, не из базы
     const currentRank = rankRewardService.getUserRank(turnover)
     console.log('[RANK-REWARDS] currentRank:', currentRank)
     
@@ -865,18 +919,10 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
     const claimed = await rankRewardService.getClaimedRewards(userId)
     console.log('[RANK-REWARDS] claimed:', claimed)
     
-    // Исправление: если оборот = 0, nextRank всегда первый ранг
-    let actualNextRank = null;
+    // Явно: если оборот = 0, nextRank всегда первый ранг
     if (turnover === 0) {
-      actualNextRank = MLM_RANKS[0];
-    } else {
-      // nextRank всегда следующий ранг, кроме максимального
-      const currentRankIndex = MLM_RANKS.findIndex(r => r.level === currentRank.level);
-      if (currentRankIndex < MLM_RANKS.length - 1) {
-        actualNextRank = MLM_RANKS[currentRankIndex + 1];
-      }
+      nextRank = MLM_RANKS[0];
     }
-    console.log('[RANK-REWARDS] actualNextRank:', actualNextRank)
     
     // Вычисляем общую сумму заклеймленных денежных наград
     const totalClaimedCash = claimed
@@ -890,12 +936,13 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
     
     res.json({
       turnover,
-      currentRank,
-      nextRank: actualNextRank,
+      currentRank, // только вычисленный
+      nextRank, // только вычисленный
       claimed,
       totalClaimedCash,
       lastClaimedPrize,
-      ranks: MLM_RANKS
+      ranks: MLM_RANKS,
+      debug: 'NEW LOGIC WORKS', // временное поле для проверки
     })
   } catch (e) {
     console.error('[RANK-REWARDS] ERROR:', e)

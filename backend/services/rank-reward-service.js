@@ -125,11 +125,19 @@ class RankRewardService {
         prize: null
       }
     }
-    let current = MLM_RANKS[0]
+    // Если оборот > 0, ищем максимальный подходящий ранг
+    let current = null;
     for (const rank of MLM_RANKS) {
-      if (turnover >= rank.turnover) current = rank
+      if (turnover >= rank.turnover) current = rank;
     }
-    return current
+    // Если не найдено ни одного ранга (теоретически невозможно), вернуть 'No rank'
+    return current || {
+      level: 0,
+      name: 'No rank',
+      turnover: 0,
+      reward: 0,
+      prize: null
+    };
   }
 
   // Получить прогресс до следующего ранга
