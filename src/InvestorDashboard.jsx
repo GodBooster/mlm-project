@@ -725,7 +725,9 @@ const InvestorDashboard = () => {
                       <div className="flex-1">
                         <div className="text-lg font-semibold text-white">{userData.username}</div>
                         <div className="text-gray-400 text-sm">{userData.email}</div>
-                        <div className="text-orange-400 text-sm">Rank {currentRank}</div>
+                        <div className="text-orange-400 text-sm">
+                          {currentRank === 0 ? 'No rank' : `Rank ${currentRank}`}
+                        </div>
                       </div>
                       <div className="flex flex-col gap-2">
                         <button 
