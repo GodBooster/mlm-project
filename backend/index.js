@@ -85,62 +85,228 @@ async function sendVerificationEmail(to, code) {
       <title>Email Verification</title>
       <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #f97316 100%); min-height: 100vh; padding: 20px; line-height: 1.6; }
-          .email-container { max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border-radius: 20px; box-shadow: 0 25px 45px rgba(0, 0, 0, 0.15); border: 1px solid rgba(249, 115, 34, 0.2); overflow: hidden; }
-          .header { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 30%, #f97316 100%); padding: 40px 30px; text-align: center; position: relative; overflow: hidden; }
-          .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(249, 115, 34, 0.1) 2px, transparent 2px); background-size: 20px 20px; animation: float 20s linear infinite; }
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #181818 0%, #23272f 40%, #f97316 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+            position: relative;
+          }
+          body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 0;
+            background: repeating-radial-gradient(circle at 20% 30%, rgba(249,115,22,0.07) 0, rgba(249,115,22,0.07) 2px, transparent 3px, transparent 100px), repeating-radial-gradient(circle at 80% 70%, rgba(234,88,12,0.06) 0, rgba(234,88,12,0.06) 2px, transparent 3px, transparent 120px);
+          }
+          .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow: 0 25px 60px rgba(249, 115, 34, 0.18), 0 2px 8px rgba(30, 41, 59, 0.10);
+            border: 2.5px solid #f97316;
+            border-bottom: 4px solid #ea580c;
+            border-top: 2.5px solid #23272f;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+          }
+          .header {
+            background: linear-gradient(135deg, #181818 0%, #23272f 30%, #f97316 100%);
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 2px solid #ea580c;
+            box-shadow: 0 4px 24px rgba(249, 115, 34, 0.10);
+          }
+          .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(249, 115, 34, 0.12) 2px, transparent 2px);
+            background-size: 20px 20px;
+            animation: float 20s linear infinite;
+          }
           @keyframes float { 0% { transform: rotate(0deg) translateX(0px) translateY(0px); } 100% { transform: rotate(360deg) translateX(0px) translateY(0px); } }
-          .logo { width: 80px; height: 80px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: white; font-weight: bold; backdrop-filter: blur(10px); border: 2px solid rgba(249, 115, 34, 0.3); position: relative; z-index: 1; box-shadow: 0 10px 30px rgba(249, 115, 34, 0.3); }
+          .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+            backdrop-filter: blur(10px);
+            border: 3px solid #fff7ed;
+            border-bottom: 3px solid #ea580c;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(249, 115, 34, 0.3);
+          }
           .header h1 { color: white; font-size: 28px; font-weight: 600; margin-bottom: 10px; position: relative; z-index: 1; }
-          .header p { color: rgba(255, 255, 255, 0.9); font-size: 16px; position: relative; z-index: 1; }
+          .header p { color: rgba(255, 255, 255, 0.93); font-size: 16px; position: relative; z-index: 1; }
           .content { padding: 50px 40px; text-align: center; }
           .welcome-text { font-size: 18px; color: #374151; margin-bottom: 30px; font-weight: 400; }
-          .verification-code { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #f97316 100%); color: white; font-size: 32px; font-weight: bold; padding: 20px 40px; border-radius: 15px; margin: 30px 0; display: inline-block; letter-spacing: 8px; box-shadow: 0 10px 30px rgba(249, 115, 34, 0.3); border: 2px solid rgba(249, 115, 34, 0.2); backdrop-filter: blur(10px); position: relative; overflow: hidden; }
-          .verification-code::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(249, 115, 34, 0.3), transparent); animation: shine 3s infinite; }
+          .verification-code {
+            background: linear-gradient(135deg, #181818 0%, #23272f 50%, #f97316 100%);
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            padding: 20px 40px;
+            border-radius: 15px;
+            margin: 30px 0;
+            display: inline-block;
+            letter-spacing: 8px;
+            box-shadow: 0 10px 30px rgba(249, 115, 34, 0.3);
+            border: 2.5px solid #f97316;
+            border-bottom: 3px solid #ea580c;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+          }
+          .verification-code::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(249, 115, 34, 0.3), transparent);
+            animation: shine 3s infinite;
+          }
           @keyframes shine { 0% { left: -100%; } 50% { left: 100%; } 100% { left: 100%; } }
           .instruction { font-size: 16px; color: #6b7280; margin: 30px 0; line-height: 1.8; }
-          .cta-button { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 16px 40px; border: none; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: all 0.3s ease; box-shadow: 0 8px 25px rgba(249, 115, 34, 0.3); position: relative; overflow: hidden; }
-          .cta-button:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(249, 115, 34, 0.4); background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%); }
-          .cta-button::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: left 0.5s; }
+          .cta-button {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            padding: 16px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(249, 115, 34, 0.3);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #f97316;
+            border-bottom: 2.5px solid #ea580c;
+          }
+          .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(249, 115, 34, 0.4);
+            background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+            border-bottom: 3px solid #dc2626;
+          }
+          .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+          }
           .cta-button:hover::before { left: 100%; }
-          .divider { width: 60px; height: 4px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); margin: 40px auto; border-radius: 2px; }
-          .footer { background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #d1d5db; }
+          .divider {
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            margin: 40px auto;
+            border-radius: 2px;
+            box-shadow: 0 2px 8px rgba(249, 115, 34, 0.15);
+            border: 1.5px solid #ea580c;
+          }
+          .footer {
+            background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 2px solid #f97316;
+            box-shadow: 0 -2px 12px rgba(249, 115, 34, 0.07);
+          }
           .footer p { color: #6b7280; font-size: 14px; margin-bottom: 10px; }
           .footer a { color: #f97316; text-decoration: none; font-weight: 500; }
           .footer a:hover { text-decoration: underline; }
-          .security-info { background: linear-gradient(135deg, rgba(249, 115, 34, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%); border-left: 4px solid #f97316; padding: 20px; margin: 30px 0; border-radius: 0 10px 10px 0; }
+          .security-info {
+            background: linear-gradient(135deg, rgba(249, 115, 34, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%);
+            border-left: 4px solid #f97316;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 0 2px 8px rgba(249, 115, 34, 0.08);
+            border-bottom: 1.5px solid #ea580c;
+          }
           .security-info h3 { color: #ea580c; font-size: 16px; margin-bottom: 10px; font-weight: 600; }
           .security-info p { color: #4b5563; font-size: 14px; margin: 0; }
           .social-links { margin: 20px 0; }
-          .social-links a { display: inline-block; width: 40px; height: 40px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; text-decoration: none; border-radius: 50%; line-height: 40px; margin: 0 5px; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(249, 115, 34, 0.2); }
-          .social-links a:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(249, 115, 34, 0.4); background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%); }
-          @media (max-width: 640px) { .email-container { margin: 10px; border-radius: 15px; } .header { padding: 30px 20px; } .header h1 { font-size: 24px; } .content { padding: 40px 20px; } .verification-code { font-size: 24px; padding: 15px 25px; letter-spacing: 4px; } .footer { padding: 20px; } }
+          .social-links a {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 50%;
+            line-height: 40px;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(249, 115, 34, 0.2);
+            border: 1.5px solid #ea580c;
+          }
+          .social-links a:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(249, 115, 34, 0.4);
+            background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+            border-bottom: 2px solid #dc2626;
+          }
+          @media (max-width: 640px) {
+            .email-container { margin: 10px; border-radius: 15px; }
+            .header { padding: 30px 20px; }
+            .header h1 { font-size: 24px; }
+            .content { padding: 40px 20px; }
+            .verification-code { font-size: 24px; padding: 15px 25px; letter-spacing: 4px; }
+            .footer { padding: 20px; }
+          }
       </style>
   </head>
   <body>
       <div class="email-container">
           <div class="header">
               <div class="logo">✓</div>
-              <h1>Добро пожаловать!</h1>
-              <p>Остался всего один шаг до активации вашего аккаунта</p>
+              <h1>Welcome!</h1>
+              <p>Just one step left to activate your account</p>
           </div>
           <div class="content">
               <p class="welcome-text">
-                  Спасибо за регистрацию в нашей платформе!
-                  <br>Пожалуйста, используйте код ниже для подтверждения вашей электронной почты.
+                  Thank you for registering on our platform!
+                  <br>Please use the code below to verify your email address.
               </p>
               <div class="verification-code">
                   ${code}
               </div>
               <p class="instruction">
-                  Введите этот код на странице подтверждения, чтобы активировать ваш аккаунт.
-                  <br><strong>Код действителен 15 минут.</strong>
+                  Enter this code on the verification page to activate your account.
+                  <br><strong>The code is valid for 15 minutes.</strong>
               </p>
-              <a href="https://invarifi.tech" class="cta-button">Подтвердить аккаунт</a>
+              <a href="https://invarifi.tech" class="cta-button">Verify Account</a>
               <div class="divider"></div>
               <div class="security-info">
-                  <h3>🔒 Вопросы по безопасности?</h3>
-                  <p>Если вы не регистрировались на нашем сайте, просто проигнорируйте это письмо. Ваш email не будет подтверждён без ввода кода.</p>
+                  <h3>🔒 Security Questions?</h3>
+                  <p>If you did not register on our website, simply ignore this email. Your email address will not be verified without entering the code.</p>
               </div>
           </div>
           <div class="footer">
@@ -151,16 +317,16 @@ async function sendVerificationEmail(to, code) {
                   <a href="#">@</a>
               </div>
               <p>
-                  Это автоматическое сообщение, отвечать на него не нужно.
+                  This is an automated message, no need to reply.
               </p>
               <p>
-                  Если у вас есть вопросы, напишите нам: 
+                  If you have any questions, contact us: 
                   <a href="mailto:support@invarifi.tech">support@invarifi.tech</a>
               </p>
               <p>
-                  <a href="#">Отписаться</a> | 
-                  <a href="#">Политика конфиденциальности</a> | 
-                  <a href="#">Пользовательское соглашение</a>
+                  <a href="#">Unsubscribe</a> | 
+                  <a href="#">Privacy Policy</a> | 
+                  <a href="#">Terms of Service</a>
               </p>
           </div>
       </div>
@@ -169,11 +335,11 @@ async function sendVerificationEmail(to, code) {
   `;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || 'MLM <no-reply@mlm.com>',
+    from: process.env.SMTP_FROM || 'Invarifi <no-reply@invarifi.tech>',
     to,
-    subject: 'Подтверждение почты — Invarifi',
+    subject: 'Email Verification — Invarifi',
     html,
-    text: `Спасибо за регистрацию на платформе Invarifi!\n\nДля подтверждения почты используйте этот код: ${code}\n\nЕсли вы не регистрировались, просто проигнорируйте это письмо.\n\nС уважением,\nКоманда Invarifi`,
+    text: `Thank you for registering on Invarifi!\n\nTo verify your email, use this code: ${code}\n\nIf you did not register, simply ignore this email.\n\nBest regards,\nThe Invarifi Team`,
   };
 
   // Отправка письма
