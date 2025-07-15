@@ -78,28 +78,92 @@ async function sendVerificationEmail(to, code) {
 
   const html = `
   <!DOCTYPE html>
-  <html>
-    <body style="background: #18181b; margin: 0; padding: 0;">
-      <div style="max-width: 420px; margin: 40px auto; background: rgba(30,41,59,0.97); border-radius: 18px; box-shadow: 0 4px 32px #0005; padding: 36px 32px; font-family: 'Segoe UI', Arial, sans-serif;">
-        <div style="text-align: center; margin-bottom: 24px;">
-          <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: #fff; border: 3px solid #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px #f9731633;">
-            <span style="font-size: 2.2em; color: #f97316; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif;">M</span>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Email Verification</title>
+      <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f97316 0%, #ef4444 100%); min-height: 100vh; padding: 20px; line-height: 1.6; }
+          .email-container { max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.97); backdrop-filter: blur(10px); border-radius: 20px; box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #f97316 0%, #ef4444 100%); padding: 40px 30px; text-align: center; position: relative; overflow: hidden; }
+          .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 2px, transparent 2px); background-size: 20px 20px; animation: float 20s linear infinite; }
+          @keyframes float { 0% { transform: rotate(0deg) translateX(0px) translateY(0px); } 100% { transform: rotate(360deg) translateX(0px) translateY(0px); } }
+          .logo { width: 80px; height: 80px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #f97316; font-weight: bold; backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.3); position: relative; z-index: 1; }
+          .header h1 { color: white; font-size: 28px; font-weight: 600; margin-bottom: 10px; position: relative; z-index: 1; }
+          .header p { color: rgba(255, 255, 255, 0.9); font-size: 16px; position: relative; z-index: 1; }
+          .content { padding: 50px 40px; text-align: center; }
+          .welcome-text { font-size: 18px; color: #333; margin-bottom: 30px; font-weight: 400; }
+          .verification-code { background: linear-gradient(135deg, #f97316 0%, #ef4444 100%); color: white; font-size: 32px; font-weight: bold; padding: 20px 40px; border-radius: 15px; margin: 30px 0; display: inline-block; letter-spacing: 8px; box-shadow: 0 10px 30px rgba(249, 115, 22, 0.15); border: 2px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); position: relative; overflow: hidden; }
+          .verification-code::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: shine 3s infinite; }
+          @keyframes shine { 0% { left: -100%; } 50% { left: 100%; } 100% { left: 100%; } }
+          .instruction { font-size: 16px; color: #666; margin: 30px 0; line-height: 1.8; }
+          .cta-button { background: linear-gradient(135deg, #f97316 0%, #ef4444 100%); color: white; padding: 16px 40px; border: none; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: all 0.3s ease; box-shadow: 0 8px 25px rgba(249, 115, 22, 0.15); position: relative; overflow: hidden; }
+          .cta-button:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(249, 115, 22, 0.25); }
+          .cta-button::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: left 0.5s; }
+          .cta-button:hover::before { left: 100%; }
+          .divider { width: 60px; height: 4px; background: linear-gradient(135deg, #f97316 0%, #ef4444 100%); margin: 40px auto; border-radius: 2px; }
+          .footer { background: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+          .footer p { color: #666; font-size: 14px; margin-bottom: 10px; }
+          .footer a { color: #f97316; text-decoration: none; font-weight: 500; }
+          .footer a:hover { text-decoration: underline; }
+          .security-info { background: rgba(249, 115, 22, 0.08); border-left: 4px solid #f97316; padding: 20px; margin: 30px 0; border-radius: 0 10px 10px 0; }
+          .security-info h3 { color: #f97316; font-size: 16px; margin-bottom: 10px; font-weight: 600; }
+          .security-info p { color: #555; font-size: 14px; margin: 0; }
+          .social-links { margin: 20px 0; }
+          .social-links a { display: inline-block; width: 40px; height: 40px; background: #f97316; color: white; text-decoration: none; border-radius: 50%; line-height: 40px; margin: 0 5px; transition: all 0.3s ease; font-size: 18px; }
+          .social-links a:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(249, 115, 22, 0.15); }
+          @media (max-width: 640px) { .email-container { margin: 10px; border-radius: 15px; } .header { padding: 30px 20px; } .header h1 { font-size: 24px; } .content { padding: 40px 20px; } .verification-code { font-size: 24px; padding: 15px 25px; letter-spacing: 4px; } .footer { padding: 20px; } }
+      </style>
+  </head>
+  <body>
+      <div class="email-container">
+          <div class="header">
+              <div class="logo">M</div>
+              <h1>Welcome!</h1>
+              <p>Just a few steps left to complete your registration</p>
           </div>
-          <h2 style="color: #f97316; margin: 0 0 8px; font-size: 1.6em; font-weight: 700; letter-spacing: 1px;">Welcome to MLM Project Transgresse!</h2>
-        </div>
-        <p style="color: #fff; font-size: 1.1em; margin-bottom: 18px;">Thank you for registering on our platform.</p>
-        <p style="color: #fff; margin-bottom: 18px;">To confirm your email, please enter this code:</p>
-        <div style="background: rgba(249,115,22,0.12); border-radius: 12px; padding: 18px 0; text-align: center; margin: 24px 0;">
-          <span style="font-size: 2.2em; font-weight: bold; letter-spacing: 8px; color: #f97316;">${code}</span>
-        </div>
-        <a href="https://invarifi.tech" style="display: block; text-align: center; margin: 24px 0 0 0; text-decoration: none;">
-          <span style="color: #f97316; font-weight: 600; font-size: 1em;">Go to MLM Project Transgresse</span>
-        </a>
-        <p style="color: #aaa; font-size: 1em; margin: 24px 0 0 0;">If you did not register on our site, simply ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #333; margin: 32px 0 16px;">
-        <p style="color: #888; font-size: 0.95em; text-align: center; margin: 0;">Best regards,<br>MLM Project Transgresse Team</p>
+          <div class="content">
+              <p class="welcome-text">
+                  Hello! We're excited to have you join our community.<br>
+                  Use the code below to verify your email address.
+              </p>
+              <div class="verification-code">
+                  ${code}
+              </div>
+              <p class="instruction">
+                  Enter this code on the verification page to activate your account.<br>
+                  <strong>The code is valid for 15 minutes.</strong>
+              </p>
+              <a href="https://invarifi.tech" class="cta-button">Verify Account</a>
+              <div class="divider"></div>
+              <div class="security-info">
+                  <h3>🔒 Security Notice</h3>
+                  <p>If you did not register on our site, simply ignore this email. Your email address will not be verified without entering the code.</p>
+              </div>
+          </div>
+          <div class="footer">
+              <div class="social-links">
+                  <a href="#">f</a>
+                  <a href="#">t</a>
+                  <a href="#">i</a>
+                  <a href="#">@</a>
+              </div>
+              <p>
+                  This is an automated message, please do not reply.
+              </p>
+              <p>
+                  If you have any questions, contact us: 
+                  <a href="mailto:support@invarifi.tech">support@invarifi.tech</a>
+              </p>
+              <p>
+                  <a href="#">Unsubscribe</a> | 
+                  <a href="#">Privacy Policy</a> | 
+                  <a href="#">Terms of Service</a>
+              </p>
+          </div>
       </div>
-    </body>
+  </body>
   </html>
   `;
 
