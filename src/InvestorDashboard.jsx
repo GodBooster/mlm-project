@@ -299,7 +299,7 @@ const InvestorDashboard = () => {
       setReferralTree(referralsData);
       setSponsor(statsData.sponsor || null);
       setTableView(statsData.tableView || []);
-      setCurrentRank(rankData.currentRank?.level || 1);
+      setCurrentRank(rankData.currentRank?.level ?? 1);
       setRankData(rankData); // Set rankData for progress bar
     } catch (error) {
       console.error('Error loading data:', error);
