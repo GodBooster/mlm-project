@@ -10,6 +10,7 @@ import rankService from './services/rank-service.js'
 import rankRewardService, { MLM_RANKS } from './services/rank-reward-service.js'
 import { authenticateToken, generateToken } from './middleware/auth.js'
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient()
 const app = express()
@@ -64,7 +65,7 @@ app.get('/invite/:code', (req, res) => {
 })
 
 // Email sending utility
-async function sendVerificationEmail(to, code) {
+async function sendVerificationEmail(to, code, token) {
   // Настройка транспорта (пример для Gmail, заменить на свой SMTP)
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -76,6 +77,7 @@ async function sendVerificationEmail(to, code) {
     },
   });
 
+  const verifyUrl = `https://api.invarifi.tech/api/verify-email?token=${token}`;
   const html = `
   <!DOCTYPE html>
   <html lang="en">
@@ -302,7 +304,7 @@ async function sendVerificationEmail(to, code) {
                   Enter this code on the verification page to activate your account.
                   <br><strong>The code is valid for 1 minute.</strong>
               </p>
-              <a href="https://api.invarifi.tech" class="cta-button">Verify Account</a>
+              <a href="${verifyUrl}" class="cta-button">Verify Account</a>
               <div class="divider"></div>
               <div class="security-info">
                   <h3>🔒 Security Questions?</h3>
@@ -375,19 +377,22 @@ app.post('/api/register', async (req, res) => {
 
     // Generate verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+    // Generate unique token for link
+    const verificationToken = crypto.randomBytes(32).toString('hex');
     
-    // Store verification code temporarily (in production, use Redis or database)
+    // Store verification code and token temporarily (in production, use Redis or database)
     if (!global.verificationCodes) global.verificationCodes = new Map()
     global.verificationCodes.set(email, {
       code: verificationCode,
+      token: verificationToken,
       expires: Date.now() + 10 * 60 * 1000, // 10 minutes
       userData: { email, name: userName, password, referralId }
     })
 
-    // Отправляем письмо с кодом
-    await sendVerificationEmail(email, verificationCode)
+    // Отправляем письмо с кодом и ссылкой
+    await sendVerificationEmail(email, verificationCode, verificationToken)
 
-    res.json({ success: true, message: 'Verification code sent to your email' })
+    res.json({ success: true, message: 'Verification code and link sent to your email' })
   } catch (error) {
     console.error('Registration error:', error)
     res.status(500).json({ error: 'Failed to register user' })
