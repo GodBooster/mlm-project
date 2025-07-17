@@ -1550,3 +1550,53 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
   console.log('Queue system and scheduler started')
 }) 
+
+// Добавить эндпоинт для получения инвестиций пользователя (только для админа)
+app.get('/api/admin/user/:id/investments', authenticateToken, async (req, res) => {
+  try {
+    // Проверка, что пользователь — админ
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+    // Получить инвестиции пользователя с пакетами
+    const investments = await prisma.investment.findMany({
+      where: { userId },
+      include: { package: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(investments);
+  } catch (error) {
+    console.error('Admin get user investments error:', error);
+    res.status(500).json({ error: 'Failed to get user investments' });
+  }
+}); 
+
+// PUT /api/admin/user/:id — редактирование пользователя (только для админа)
+app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+    const allowedFields = ['email', 'username', 'rank', 'wallet', 'avatar', 'isAdmin', 'emailVerified'];
+    const updateData = {};
+    for (const field of allowedFields) {
+      if (field in req.body) updateData[field] = req.body[field];
+    }
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData
+    });
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Admin update user error:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+}); 

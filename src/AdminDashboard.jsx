@@ -36,6 +36,20 @@ export default function AdminDashboard() {
   const [deleting, setDeleting] = useState(false);
   const [showAddTransactionModal, setShowAddTransactionModal] = useState(false);
 
+  // 1. Добавить состояния для модального окна профиля пользователя
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userInvestments, setUserInvestments] = useState([]);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editUserForm, setEditUserForm] = useState({
+    username: '',
+    email: '',
+    avatar: '',
+    wallet: '',
+    emailVerified: false
+  });
+
   useEffect(() => {
     if (!token) return;
     loadData();
@@ -196,6 +210,27 @@ export default function AdminDashboard() {
       setLoginError('Network error');
     }
     setLoggingIn(false);
+  };
+
+  // 2. Функция для открытия профиля пользователя
+  const handleViewUser = async (user) => {
+    setSelectedUser(user);
+    setShowProfileModal(true);
+    setLoadingProfile(true);
+    try {
+      const res = await fetch(`${API}/api/admin/user/${user.id}/investments`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserInvestments(Array.isArray(data) ? data : []);
+      } else {
+        setUserInvestments([]);
+      }
+    } catch {
+      setUserInvestments([]);
+    }
+    setLoadingProfile(false);
   };
 
   const navigation = [
@@ -422,7 +457,7 @@ export default function AdminDashboard() {
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-2 px-3">
-                          <button className="text-blue-400 hover:text-blue-300 text-sm">View</button>
+                          <button className="text-blue-400 hover:text-blue-300 text-sm" onClick={() => handleViewUser(user)}>View</button>
                         </td>
                       </tr>
                     ))}
@@ -674,6 +709,204 @@ export default function AdminDashboard() {
               Add Transaction
             </h3>
             <AdminAddTransaction token={token} users={users} />
+          </div>
+        </div>
+      )}
+
+      {/* User Profile Modal */}
+      {showProfileModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-8 rounded-2xl max-w-lg w-full relative">
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold focus:outline-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h3 className="text-2xl font-bold text-white mb-4">User Profile</h3>
+            <div className="mb-4 flex items-center gap-4">
+              {selectedUser.avatar && (
+                <img src={selectedUser.avatar} alt="avatar" className="w-16 h-16 rounded-full object-cover border-2 border-orange-500" />
+              )}
+              <div>
+                <div className="text-gray-300 mb-1"><b>ID:</b> {selectedUser.id}</div>
+                <div className="text-gray-300 mb-1"><b>Username:</b> {selectedUser.username}</div>
+                <div className="text-gray-300 mb-1"><b>Email:</b> {selectedUser.email}</div>
+                <div className="text-gray-300 mb-1"><b>Email Verified:</b> {selectedUser.emailVerified ? 'Yes' : 'No'}</div>
+                <div className="text-gray-300 mb-1"><b>Wallet:</b> {selectedUser.wallet || '-'}</div>
+                <div className="text-gray-300 mb-1"><b>Balance:</b> ${selectedUser.balance?.toFixed(2)}</div>
+                <div className="text-gray-300 mb-1"><b>Rank:</b> {selectedUser.rank}</div>
+                <div className="text-gray-300 mb-1"><b>Joined:</b> {new Date(selectedUser.createdAt).toLocaleDateString()}</div>
+              </div>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <button
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                onClick={() => setEditMode(true)}
+              >
+                Edit
+              </button>
+              <button
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                onClick={() => setShowProfileModal(false)}
+              >
+                Close
+              </button>
+            </div>
+            <h4 className="text-lg font-semibold text-white mb-2">Investment History</h4>
+            {loadingProfile ? (
+              <div className="text-gray-400">Loading investments...</div>
+            ) : userInvestments.length === 0 ? (
+              <div className="text-gray-400">No investments.</div>
+            ) : (
+              <div className="overflow-x-auto max-h-48">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-400 border-b border-gray-700">
+                      <th className="text-left py-2 px-2">Package</th>
+                      <th className="text-left py-2 px-2">Amount</th>
+                      <th className="text-left py-2 px-2">Start</th>
+                      <th className="text-left py-2 px-2">End</th>
+                      <th className="text-left py-2 px-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userInvestments.map((inv) => (
+                      <tr key={inv.id} className="border-b border-gray-800">
+                        <td className="py-1 px-2 text-white">{inv.package?.name || inv.packageId}</td>
+                        <td className="py-1 px-2 text-green-400">${inv.amount?.toFixed(2)}</td>
+                        <td className="py-1 px-2 text-gray-300">{new Date(inv.startDate).toLocaleDateString()}</td>
+                        <td className="py-1 px-2 text-gray-300">{new Date(inv.endDate).toLocaleDateString()}</td>
+                        <td className="py-1 px-2">
+                          <span className={`px-2 py-1 rounded text-xs ${inv.isActive ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400'}`}>
+                            {inv.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editMode && selectedUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-8 rounded-2xl max-w-lg w-full relative">
+            <button
+              type="button"
+              onClick={() => setEditMode(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold focus:outline-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h3 className="text-2xl font-bold text-white mb-4">Edit User</h3>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                // Отправить PUT запрос на backend
+                const res = await fetch(`${API}/api/admin/user/${selectedUser.id}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                  },
+                  body: JSON.stringify(editUserForm)
+                });
+                if (res.ok) {
+                  const updated = await res.json();
+                  setSelectedUser(updated);
+                  setEditMode(false);
+                  loadData();
+                } else {
+                  alert('Failed to update user');
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-gray-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editUserForm.email}
+                  onChange={e => setEditUserForm(f => ({ ...f, email: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-1">Username</label>
+                <input
+                  type="text"
+                  value={editUserForm.username}
+                  onChange={e => setEditUserForm(f => ({ ...f, username: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-1">Rank</label>
+                <input
+                  type="text"
+                  value={editUserForm.rank}
+                  onChange={e => setEditUserForm(f => ({ ...f, rank: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-1">Wallet</label>
+                <input
+                  type="text"
+                  value={editUserForm.wallet}
+                  onChange={e => setEditUserForm(f => ({ ...f, wallet: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-1">Avatar URL</label>
+                <input
+                  type="text"
+                  value={editUserForm.avatar}
+                  onChange={e => setEditUserForm(f => ({ ...f, avatar: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex gap-4 items-center">
+                <label className="text-gray-300">Email Verified</label>
+                <input
+                  type="checkbox"
+                  checked={editUserForm.emailVerified}
+                  onChange={e => setEditUserForm(f => ({ ...f, emailVerified: e.target.checked }))}
+                />
+                <label className="text-gray-300">Is Admin</label>
+                <input
+                  type="checkbox"
+                  checked={editUserForm.isAdmin}
+                  onChange={e => setEditUserForm(f => ({ ...f, isAdmin: e.target.checked }))}
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditMode(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
