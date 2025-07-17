@@ -22,6 +22,7 @@ model User {
   updatedAt    DateTime      @updatedAt
   username     String        @unique
   isAdmin      Boolean       @default(false)
+  isBlocked    Boolean       @default(false)
   investments  Investment[]
   transactions Transaction[]
   referrer     User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])

@@ -1107,31 +1107,30 @@ app.post('/api/users', async (req, res) => {
   }
 })
 
+// Исправить /api/users/:id чтобы возвращал инвестиции с пакетами
 app.get('/api/users/:id', async (req, res) => {
   try {
-    const { id } = req.params
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
     const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: userId },
       include: {
         investments: {
-          include: {
-            package: true
-          }
-        },
-        transactions: true,
-        referrals: true
+          include: { package: true }
+        }
       }
-    })
-    
+    });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+      return res.status(404).json({ error: 'User not found' });
     }
-    
-    res.json(user)
+    res.json(user);
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Failed to get user' });
   }
-})
+});
 
 // Investment packages routes
 app.get('/api/packages', async (req, res) => {
@@ -1337,7 +1336,9 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
         rank: true,
         referralCode: true,
         createdAt: true,
-        wallet: true
+        wallet: true,
+        lastLogin: true,
+        rankNumber: true
       },
       orderBy: { createdAt: 'desc' }
     })
@@ -1575,6 +1576,27 @@ app.get('/api/admin/user/:id/investments', authenticateToken, async (req, res) =
   }
 }); 
 
+// GET /api/admin/user/:id/transactions
+app.get('/api/admin/user/:id/transactions', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+    const transactions = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(transactions);
+  } catch (error) {
+    console.error('Admin get user transactions error:', error);
+    res.status(500).json({ error: 'Failed to get user transactions' });
+  }
+});
+
 // PUT /api/admin/user/:id — редактирование пользователя (только для админа)
 app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
   try {
@@ -1585,10 +1607,14 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'Invalid user id' });
     }
-    const allowedFields = ['email', 'username', 'rank', 'wallet', 'avatar', 'isAdmin', 'emailVerified'];
+    const allowedFields = ['email', 'username', 'wallet', 'isAdmin'];
     const updateData = {};
     for (const field of allowedFields) {
       if (field in req.body) updateData[field] = req.body[field];
+    }
+    if (req.body.password) {
+      const bcrypt = await import('bcrypt');
+      updateData.password = await bcrypt.hash(req.body.password, 10);
     }
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -1598,5 +1624,65 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Admin update user error:', error);
     res.status(500).json({ error: 'Failed to update user' });
+  }
+}); 
+
+// DELETE /api/admin/user/:id — удаление пользователя (только для админа)
+app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+    await prisma.user.delete({ where: { id: userId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// PUT /api/admin/user/:id/block — блокировка пользователя (isBlocked=true)
+app.put('/api/admin/user/:id/block', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { isBlocked: true }
+    });
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Admin block user error:', error);
+    res.status(500).json({ error: 'Failed to block user' });
+  }
+});
+
+// PUT /api/admin/user/:id/unblock — разблокировка пользователя (isBlocked=false)
+app.put('/api/admin/user/:id/unblock', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { isBlocked: false }
+    });
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Admin unblock user error:', error);
+    res.status(500).json({ error: 'Failed to unblock user' });
   }
 }); 

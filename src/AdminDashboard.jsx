@@ -734,11 +734,11 @@ export default function AdminDashboard() {
                 <div className="text-gray-300 mb-1"><b>ID:</b> {selectedUser.id}</div>
                 <div className="text-gray-300 mb-1"><b>Username:</b> {selectedUser.username}</div>
                 <div className="text-gray-300 mb-1"><b>Email:</b> {selectedUser.email}</div>
-                <div className="text-gray-300 mb-1"><b>Email Verified:</b> {selectedUser.emailVerified ? 'Yes' : 'No'}</div>
-                <div className="text-gray-300 mb-1"><b>Wallet:</b> {selectedUser.wallet || '-'}</div>
+                <div className="text-gray-300 mb-1"><b>Wallet Withdraw:</b> {selectedUser.wallet || '-'}</div>
                 <div className="text-gray-300 mb-1"><b>Balance:</b> ${selectedUser.balance?.toFixed(2)}</div>
-                <div className="text-gray-300 mb-1"><b>Rank:</b> {selectedUser.rank}</div>
-                <div className="text-gray-300 mb-1"><b>Joined:</b> {new Date(selectedUser.createdAt).toLocaleDateString()}</div>
+                <div className="text-gray-300 mb-1"><b>Rank:</b> {selectedUser.rankNumber || selectedUser.rank || '-'}</div>
+                <div className="text-gray-300 mb-1"><b>Joined:</b> {selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : '-'}</div>
+                <div className="text-gray-300 mb-1"><b>Registered:</b> {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString() : '-'}</div>
               </div>
             </div>
             <div className="flex gap-2 mb-4">
@@ -754,36 +754,80 @@ export default function AdminDashboard() {
               >
                 Close
               </button>
+              {selectedUser.isBlocked ? (
+                <button
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                  onClick={async () => {
+                    await fetch(`${API}/api/admin/user/${selectedUser.id}/unblock`, {
+                      method: 'PUT',
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    await loadData();
+                    setSelectedUser({ ...selectedUser, isBlocked: false });
+                  }}
+                >
+                  Unblock
+                </button>
+              ) : (
+                <button
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg"
+                  onClick={async () => {
+                    await fetch(`${API}/api/admin/user/${selectedUser.id}/block`, {
+                      method: 'PUT',
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    await loadData();
+                    setSelectedUser({ ...selectedUser, isBlocked: true });
+                  }}
+                >
+                  Block
+                </button>
+              )}
+              <button
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to delete this user?')) {
+                    await fetch(`${API}/api/admin/user/${selectedUser.id}`, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    await loadData();
+                    setShowProfileModal(false);
+                  }
+                }}
+              >
+                Delete
+              </button>
             </div>
-            <h4 className="text-lg font-semibold text-white mb-2">Investment History</h4>
+            <h4 className="text-lg font-semibold text-white mb-2">Transaction History</h4>
             {loadingProfile ? (
-              <div className="text-gray-400">Loading investments...</div>
+              <div className="text-gray-400">Loading transactions...</div>
             ) : userInvestments.length === 0 ? (
-              <div className="text-gray-400">No investments.</div>
+              <div className="text-gray-400">No transactions.</div>
             ) : (
               <div className="overflow-x-auto max-h-48">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-gray-400 border-b border-gray-700">
-                      <th className="text-left py-2 px-2">Package</th>
+                      <th className="text-left py-2 px-2">Date</th>
+                      <th className="text-left py-2 px-2">Type</th>
                       <th className="text-left py-2 px-2">Amount</th>
-                      <th className="text-left py-2 px-2">Start</th>
-                      <th className="text-left py-2 px-2">End</th>
                       <th className="text-left py-2 px-2">Status</th>
+                      <th className="text-left py-2 px-2">Description</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {userInvestments.map((inv) => (
-                      <tr key={inv.id} className="border-b border-gray-800">
-                        <td className="py-1 px-2 text-white">{inv.package?.name || inv.packageId}</td>
-                        <td className="py-1 px-2 text-green-400">${inv.amount?.toFixed(2)}</td>
-                        <td className="py-1 px-2 text-gray-300">{new Date(inv.startDate).toLocaleDateString()}</td>
-                        <td className="py-1 px-2 text-gray-300">{new Date(inv.endDate).toLocaleDateString()}</td>
+                    {userInvestments.map((tx) => (
+                      <tr key={tx.id} className="border-b border-gray-800">
+                        <td className="py-1 px-2 text-gray-300">{new Date(tx.createdAt).toLocaleString()}</td>
+                        <td className="py-1 px-2 text-orange-400">{tx.type}</td>
+                        <td className="py-1 px-2 text-green-400">${tx.amount?.toFixed(2)}</td>
                         <td className="py-1 px-2">
-                          <span className={`px-2 py-1 rounded text-xs ${inv.isActive ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400'}`}>
-                            {inv.isActive ? 'Active' : 'Inactive'}
+                          <span className={`px-2 py-1 rounded text-xs ${tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' : tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-red-900/20 text-red-400'}`}>
+                            {tx.status}
                           </span>
                         </td>
+                        <td className="py-1 px-2 text-gray-300">{tx.description}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -851,15 +895,6 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-1">Rank</label>
-                <input
-                  type="text"
-                  value={editUserForm.rank}
-                  onChange={e => setEditUserForm(f => ({ ...f, rank: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                />
-              </div>
-              <div>
                 <label className="block text-gray-300 mb-1">Wallet</label>
                 <input
                   type="text"
@@ -869,12 +904,13 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-1">Avatar URL</label>
+                <label className="block text-gray-300 mb-1">Password</label>
                 <input
-                  type="text"
-                  value={editUserForm.avatar}
-                  onChange={e => setEditUserForm(f => ({ ...f, avatar: e.target.value }))}
+                  type="password"
+                  value={editUserForm.password || ''}
+                  onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                  placeholder="Leave blank to keep current password"
                 />
               </div>
               <div className="flex gap-4 items-center">
