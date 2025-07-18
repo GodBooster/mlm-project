@@ -11,16 +11,20 @@ export default function AdminAddTransaction({ token, users }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Загружать активные инвестиции только если выбран тип DAILY_PROFIT
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || type !== 'DAILY_PROFIT') {
+      setInvestments([]);
+      setInvestmentId('');
+      return;
+    }
     setInvestments([]);
     setInvestmentId('');
     fetch(`/api/users/${userId}`)
       .then(res => res.json())
       .then(user => {
         if (user && user.investments) {
-          console.log('user.investments:', user.investments); // временный вывод для отладки
-          // Показывать все активные инвестиции (isActive === true)
+          // Только активные инвестиции
           const active = user.investments.filter(inv => inv.isActive);
           setInvestments(active);
           if (active.length > 0) setInvestmentId(active[0].id);
@@ -28,7 +32,7 @@ export default function AdminAddTransaction({ token, users }) {
           setInvestments([]);
         }
       });
-  }, [userId]);
+  }, [userId, type]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,7 +48,7 @@ export default function AdminAddTransaction({ token, users }) {
         },
         body: JSON.stringify({
           userId,
-          investmentId: investmentId || undefined,
+          investmentId: type === 'DAILY_PROFIT' ? investmentId : undefined,
           amount,
           type,
           description
@@ -56,6 +60,7 @@ export default function AdminAddTransaction({ token, users }) {
         setAmount('');
         setType('DAILY_PROFIT');
         setDescription('');
+        setInvestmentId('');
       } else {
         setError(data.error || 'Failed to add transaction');
       }
@@ -78,6 +83,18 @@ export default function AdminAddTransaction({ token, users }) {
           ))}
         </select>
       </div>
+      <div>
+        <label className="block text-gray-300 mb-1 font-medium">Transaction Type</label>
+        <select value={type} onChange={e => setType(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none">
+          <option value="DAILY_PROFIT">DAILY_PROFIT</option>
+          <option value="DEPOSIT">DEPOSIT</option>
+          <option value="WITHDRAWAL">WITHDRAWAL</option>
+          <option value="REFERRAL_BONUS">REFERRAL_BONUS</option>
+          <option value="RANK_BONUS">RANK_BONUS</option>
+          <option value="RANK_REWARD">RANK_REWARD</option>
+          <option value="BONUS">BONUS</option>
+        </select>
+      </div>
       {type === 'DAILY_PROFIT' && (
         <div>
           <label className="block text-gray-300 mb-1 font-medium">Investment</label>
@@ -94,18 +111,6 @@ export default function AdminAddTransaction({ token, users }) {
       <div>
         <label className="block text-gray-300 mb-1 font-medium">Amount</label>
         <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none" />
-      </div>
-      <div>
-        <label className="block text-gray-300 mb-1 font-medium">Transaction Type</label>
-        <select value={type} onChange={e => setType(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none">
-          <option value="DAILY_PROFIT">DAILY_PROFIT</option>
-          <option value="DEPOSIT">DEPOSIT</option>
-          <option value="WITHDRAWAL">WITHDRAWAL</option>
-          <option value="REFERRAL_BONUS">REFERRAL_BONUS</option>
-          <option value="RANK_BONUS">RANK_BONUS</option>
-          <option value="RANK_REWARD">RANK_REWARD</option>
-          <option value="BONUS">BONUS</option>
-        </select>
       </div>
       <div>
         <label className="block text-gray-300 mb-1 font-medium">Description</label>
