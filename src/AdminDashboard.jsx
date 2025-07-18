@@ -836,54 +836,6 @@ export default function AdminDashboard() {
                 Delete
               </button>
             </div>
-            <h4 className="text-lg font-semibold text-white mb-2">Transaction History</h4>
-            {loadingProfile ? (
-              <div className="text-gray-400">Loading transactions...</div>
-            ) : userInvestments.length === 0 && userTransactions.length === 0 ? (
-              <div className="text-gray-400">No transactions.</div>
-            ) : (
-              <div className="overflow-x-auto max-h-48">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-gray-400 border-b border-gray-700">
-                      <th className="text-left py-2 px-2">Date</th>
-                      <th className="text-left py-2 px-2">Type</th>
-                      <th className="text-left py-2 px-2">Amount</th>
-                      <th className="text-left py-2 px-2">Status</th>
-                      <th className="text-left py-2 px-2">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {userInvestments.map((tx) => (
-                      <tr key={tx.id} className="border-b border-gray-800">
-                        <td className="py-1 px-2 text-gray-300">{new Date(tx.createdAt).toLocaleString()}</td>
-                        <td className="py-1 px-2 text-orange-400">{tx.type}</td>
-                        <td className="py-1 px-2 text-green-400">${tx.amount?.toFixed(2)}</td>
-                        <td className="py-1 px-2">
-                          <span className={`px-2 py-1 rounded text-xs ${tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' : tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-red-900/20 text-red-400'}`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                        <td className="py-1 px-2 text-gray-300">{tx.description}</td>
-                      </tr>
-                    ))}
-                    {userTransactions.map((tx) => (
-                      <tr key={tx.id} className="border-b border-gray-800">
-                        <td className="py-1 px-2 text-gray-300">{new Date(tx.createdAt).toLocaleString()}</td>
-                        <td className="py-1 px-2 text-orange-400">{tx.type}</td>
-                        <td className="py-1 px-2 text-green-400">${tx.amount?.toFixed(2)}</td>
-                        <td className="py-1 px-2">
-                          <span className={`px-2 py-1 rounded text-xs ${tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' : tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-red-900/20 text-red-400'}`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                        <td className="py-1 px-2 text-gray-300">{tx.description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         </div>
       )}
