@@ -73,9 +73,6 @@ export default function AdminAddTransaction({ token, users }) {
 
   return (
     <>
-      <pre style={{color: 'white', background: '#222', padding: 8, fontSize: 12}}>
-        {JSON.stringify(investments, null, 2)}
-      </pre>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-gray-300 mb-1 font-medium">User</label>
