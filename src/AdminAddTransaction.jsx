@@ -19,7 +19,8 @@ export default function AdminAddTransaction({ token, users }) {
       .then(res => res.json())
       .then(user => {
         if (user && user.investments) {
-          const active = user.investments.filter(inv => inv.isActive && new Date(inv.endDate) > new Date());
+          // Показывать все активные инвестиции (isActive === true)
+          const active = user.investments.filter(inv => inv.isActive);
           setInvestments(active);
           if (active.length > 0) setInvestmentId(active[0].id);
         } else {
