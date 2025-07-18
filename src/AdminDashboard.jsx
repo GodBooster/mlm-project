@@ -40,6 +40,7 @@ export default function AdminDashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userInvestments, setUserInvestments] = useState([]);
+  const [userTransactions, setUserTransactions] = useState([]);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editUserForm, setEditUserForm] = useState({
@@ -218,17 +219,27 @@ export default function AdminDashboard() {
     setShowProfileModal(true);
     setLoadingProfile(true);
     try {
-      const res = await fetch(`${API}/api/admin/user/${user.id}/investments`, {
+      // Получить инвестиции
+      const invRes = await fetch(`${API}/api/admin/user/${user.id}/investments`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setUserInvestments(Array.isArray(data) ? data : []);
-      } else {
-        setUserInvestments([]);
+      let investments = [];
+      if (invRes.ok) {
+        investments = await invRes.json();
       }
+      setUserInvestments(Array.isArray(investments) ? investments : []);
+      // Получить транзакции
+      const txRes = await fetch(`${API}/api/admin/user/${user.id}/transactions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      let transactions = [];
+      if (txRes.ok) {
+        transactions = await txRes.json();
+      }
+      setUserTransactions(Array.isArray(transactions) ? transactions : []);
     } catch {
       setUserInvestments([]);
+      setUserTransactions([]);
     }
     setLoadingProfile(false);
   };
@@ -802,7 +813,7 @@ export default function AdminDashboard() {
             <h4 className="text-lg font-semibold text-white mb-2">Transaction History</h4>
             {loadingProfile ? (
               <div className="text-gray-400">Loading transactions...</div>
-            ) : userInvestments.length === 0 ? (
+            ) : userInvestments.length === 0 && userTransactions.length === 0 ? (
               <div className="text-gray-400">No transactions.</div>
             ) : (
               <div className="overflow-x-auto max-h-48">
@@ -818,6 +829,19 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {userInvestments.map((tx) => (
+                      <tr key={tx.id} className="border-b border-gray-800">
+                        <td className="py-1 px-2 text-gray-300">{new Date(tx.createdAt).toLocaleString()}</td>
+                        <td className="py-1 px-2 text-orange-400">{tx.type}</td>
+                        <td className="py-1 px-2 text-green-400">${tx.amount?.toFixed(2)}</td>
+                        <td className="py-1 px-2">
+                          <span className={`px-2 py-1 rounded text-xs ${tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' : tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-red-900/20 text-red-400'}`}>
+                            {tx.status}
+                          </span>
+                        </td>
+                        <td className="py-1 px-2 text-gray-300">{tx.description}</td>
+                      </tr>
+                    ))}
+                    {userTransactions.map((tx) => (
                       <tr key={tx.id} className="border-b border-gray-800">
                         <td className="py-1 px-2 text-gray-300">{new Date(tx.createdAt).toLocaleString()}</td>
                         <td className="py-1 px-2 text-orange-400">{tx.type}</td>

@@ -22,6 +22,8 @@ export default function AdminAddTransaction({ token, users }) {
           const active = user.investments.filter(inv => inv.isActive && new Date(inv.endDate) > new Date());
           setInvestments(active);
           if (active.length > 0) setInvestmentId(active[0].id);
+        } else {
+          setInvestments([]);
         }
       });
   }, [userId]);
