@@ -1338,7 +1338,6 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
         createdAt: true,
         wallet: true,
         lastLogin: true,
-        rankNumber: true
       },
       orderBy: { createdAt: 'desc' }
     })
