@@ -51,6 +51,12 @@ export default function AdminDashboard() {
     emailVerified: false
   });
 
+  // State for history modal
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyUser, setHistoryUser] = useState(null);
+  const [historyTransactions, setHistoryTransactions] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   useEffect(() => {
     if (!token) return;
     loadData();
@@ -242,6 +248,25 @@ export default function AdminDashboard() {
       setUserTransactions([]);
     }
     setLoadingProfile(false);
+  };
+
+  const handleShowHistory = async (user) => {
+    setHistoryUser(user);
+    setShowHistoryModal(true);
+    setLoadingHistory(true);
+    try {
+      const txRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${user.id}/transactions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      let transactions = [];
+      if (txRes.ok) {
+        transactions = await txRes.json();
+      }
+      setHistoryTransactions(Array.isArray(transactions) ? transactions : []);
+    } catch {
+      setHistoryTransactions([]);
+    }
+    setLoadingHistory(false);
   };
 
   const navigation = [
@@ -468,7 +493,8 @@ export default function AdminDashboard() {
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-2 px-3">
-                          <button className="text-blue-400 hover:text-blue-300 text-sm" onClick={() => handleViewUser(user)}>View</button>
+                          <button className="text-blue-400 hover:text-blue-300 text-sm mr-2" onClick={() => handleViewUser(user)}>View</button>
+                          <button className="text-purple-400 hover:text-purple-300 text-sm" onClick={() => handleShowHistory(user)}>History</button>
                         </td>
                       </tr>
                     ))}
@@ -967,6 +993,56 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-gray-900 rounded-2xl shadow-lg p-6 w-full max-w-2xl relative">
+            <button className="absolute top-4 right-4 text-gray-400 hover:text-white" onClick={() => setShowHistoryModal(false)}>&times;</button>
+            <h3 className="text-xl font-semibold text-white mb-4">Transaction History for {historyUser?.username || historyUser?.email}</h3>
+            {loadingHistory ? (
+              <div className="text-white">Loading...</div>
+            ) : (
+              <div className="overflow-x-auto max-h-[60vh]">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-900/80">
+                    <tr className="text-gray-400 border-b border-gray-700">
+                      <th className="text-left py-2 px-3">Date</th>
+                      <th className="text-left py-2 px-3">Type</th>
+                      <th className="text-left py-2 px-3">Amount</th>
+                      <th className="text-left py-2 px-3">Description</th>
+                      <th className="text-left py-2 px-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyTransactions.length === 0 ? (
+                      <tr><td colSpan={5} className="text-gray-400 text-center py-4">No transactions found</td></tr>
+                    ) : (
+                      historyTransactions.map((tx, i) => (
+                        <tr key={i} className="border-b border-gray-800">
+                          <td className="py-2 px-3 text-gray-300">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                          <td className="py-2 px-3 text-orange-400">{tx.type}</td>
+                          <td className="py-2 px-3 text-white">${Number(tx.amount).toFixed(2)}</td>
+                          <td className="py-2 px-3 text-gray-300 max-w-[200px] truncate" title={tx.description}>{tx.description}</td>
+                          <td className="py-2 px-3">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
+                              tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
+                              'bg-red-900/20 text-red-400'
+                            }`}>
+                              {tx.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
