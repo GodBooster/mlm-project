@@ -20,7 +20,7 @@ export default function AdminAddTransaction({ token, users }) {
     }
     setInvestments([]);
     setInvestmentId('');
-    fetch(`/api/users/${userId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`)
       .then(res => res.json())
       .then(user => {
         if (user && user.investments) {
@@ -40,7 +40,7 @@ export default function AdminAddTransaction({ token, users }) {
     setSuccess(null);
     setError(null);
     try {
-      const res = await fetch('/api/admin/transactions', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/transactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
