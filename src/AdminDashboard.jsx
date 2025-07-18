@@ -7,7 +7,7 @@ const Card = ({ children, className = "" }) => (
   <div className={`bg-gray-900 shadow-lg rounded-2xl p-6 mb-6 ${className}`}>{children}</div>
 );
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API = import.meta.env.VITE_API_URL;
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('overview');
@@ -60,9 +60,9 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const [usersRes, transactionsRes, packagesRes] = await Promise.all([
-        fetch(`${API}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API}/api/admin/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API}/api/admin/packages`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/packages`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       // Check response statuses
@@ -120,8 +120,8 @@ export default function AdminDashboard() {
     setSaving(true);
     try {
       const url = editingPackage 
-        ? `${API}/api/admin/packages/${editingPackage.id}`
-        : `${API}/api/admin/packages`;
+        ? `${import.meta.env.VITE_API_URL}/api/admin/packages/${editingPackage.id}`
+        : `${import.meta.env.VITE_API_URL}/api/admin/packages`;
       
       const method = editingPackage ? 'PUT' : 'POST';
       
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
     
     setDeleting(true);
     try {
-      const res = await fetch(`${API}/api/admin/packages/${pkgId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/packages/${pkgId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -193,7 +193,7 @@ export default function AdminDashboard() {
     setLoggingIn(true);
     setLoginError('');
     try {
-      const res = await fetch(`${API}/api/login`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginForm)
@@ -220,7 +220,7 @@ export default function AdminDashboard() {
     setLoadingProfile(true);
     try {
       // Получить инвестиции
-      const invRes = await fetch(`${API}/api/admin/user/${user.id}/investments`, {
+      const invRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${user.id}/investments`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       let investments = [];
@@ -229,7 +229,7 @@ export default function AdminDashboard() {
       }
       setUserInvestments(Array.isArray(investments) ? investments : []);
       // Получить транзакции
-      const txRes = await fetch(`${API}/api/admin/user/${user.id}/transactions`, {
+      const txRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${user.id}/transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       let transactions = [];
@@ -769,7 +769,7 @@ export default function AdminDashboard() {
                 <button
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
                   onClick={async () => {
-                    await fetch(`${API}/api/admin/user/${selectedUser.id}/unblock`, {
+                    await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}/unblock`, {
                       method: 'PUT',
                       headers: { Authorization: `Bearer ${token}` }
                     });
@@ -783,7 +783,7 @@ export default function AdminDashboard() {
                 <button
                   className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg"
                   onClick={async () => {
-                    await fetch(`${API}/api/admin/user/${selectedUser.id}/block`, {
+                    await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}/block`, {
                       method: 'PUT',
                       headers: { Authorization: `Bearer ${token}` }
                     });
@@ -798,7 +798,7 @@ export default function AdminDashboard() {
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
                 onClick={async () => {
                   if (window.confirm('Are you sure you want to delete this user?')) {
-                    await fetch(`${API}/api/admin/user/${selectedUser.id}`, {
+                    await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}`, {
                       method: 'DELETE',
                       headers: { Authorization: `Bearer ${token}` }
                     });
@@ -879,7 +879,7 @@ export default function AdminDashboard() {
               onSubmit={async (e) => {
                 e.preventDefault();
                 // Отправить PUT запрос на backend
-                const res = await fetch(`${API}/api/admin/user/${selectedUser.id}`, {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}`, {
                   method: 'PUT',
                   headers: {
                     'Content-Type': 'application/json',
