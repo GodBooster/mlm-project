@@ -19,6 +19,7 @@ export default function AdminAddTransaction({ token, users }) {
       .then(res => res.json())
       .then(user => {
         if (user && user.investments) {
+          console.log('user.investments:', user.investments); // временный вывод для отладки
           // Показывать все активные инвестиции (isActive === true)
           const active = user.investments.filter(inv => inv.isActive);
           setInvestments(active);

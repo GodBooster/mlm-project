@@ -1119,7 +1119,7 @@ app.get('/api/users/:id', async (req, res) => {
       include: {
         investments: {
           include: { package: true }
-        }
+          }
       }
     });
     if (!user) {
