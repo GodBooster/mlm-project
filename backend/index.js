@@ -1343,6 +1343,7 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
     })
     res.json(users)
   } catch (error) {
+    console.error('ADMIN USERS ERROR:', error);
     res.status(500).json({ error: error.message })
   }
 })

@@ -1,38 +1,69 @@
-# React + Vite
+# MLM Project
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Environment Setup
 
-Currently, two official plugins are available:
+### Frontend (.env)
+```
+VITE_API_URL=https://api.margine-space.com
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Backend (.env)
+```
+PORT=3000
+DATABASE_URL="postgresql://mlmuser:your_password@localhost:5432/mlmdb"
+JWT_SECRET=your_jwt_secret
+NODE_ENV=production
+FRONTEND_URL=https://margine-space.com
+```
 
-## Expanding the ESLint configuration
+## Deployment
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 17
+- PM2 (for production)
 
-# Личный кабинет инвестора (MLM)
+### Server Deployment
+1. Clone the repository
+2. Set up environment variables
+3. Install dependencies:
+```bash
+npm install
+cd backend && npm install
+```
+4. Start the backend:
+```bash
+cd backend
+pm2 start index.js
+```
 
-## Запуск проекта
+### Netlify Deployment
+The project is automatically deployed to Netlify when changes are pushed to the main branch.
 
-1. Установите зависимости:
-   ```
-   npm install
-   ```
-2. Создайте файл `.env` в папке `frontend` и укажите базовый URL API:
-   ```
-   VITE_API_BASE_URL=https://api.example.com
-   ```
-3. Запустите локальный сервер:
-   ```
-   npm run dev
-   ```
+Required Netlify environment variables:
+- VITE_API_URL=https://api.margine-space.com
 
-## Страницы
-- `/login` — авторизация и регистрация
-- `/dashboard` — баланс, депозит, вывод, история транзакций
-- `/packages` — инвестиционные пакеты
-- `/referrals` — реферальная система
-- `/profile` — профиль пользователя
+### Database Setup
+1. Create PostgreSQL database:
+```sql
+CREATE DATABASE mlmdb;
+CREATE USER mlmuser WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE mlmdb TO mlmuser;
+```
 
-## Минималистичный дизайн, все действия отправляются на внешний API (см. .env)
+2. Run migrations:
+```bash
+cd backend
+npx prisma migrate deploy
+```
+
+## Automatic Deployment
+
+The project uses GitHub Actions for automatic deployment:
+- Frontend is automatically deployed to Netlify
+- Backend is automatically deployed to the production server
+
+Required GitHub Secrets:
+- SERVER_HOST
+- SERVER_USERNAME
+- SSH_PRIVATE_KEY

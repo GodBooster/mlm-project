@@ -23,6 +23,7 @@ model User {
   username     String        @unique
   isAdmin      Boolean       @default(false)
   isBlocked    Boolean       @default(false)
+  lastLogin    DateTime?     // дата и время последнего входа
   investments  Investment[]
   transactions Transaction[]
   referrer     User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
