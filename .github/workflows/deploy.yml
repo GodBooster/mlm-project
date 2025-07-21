@@ -24,8 +24,8 @@ jobs:
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
+          host: ${{ secrets.SERVER_HOST }}         # ← здесь должен быть 49.13.212.207
+          username: ${{ secrets.SERVER_USERNAME }} # например, root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/mlm-project
