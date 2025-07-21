@@ -4,7 +4,7 @@
 
 ### Frontend (.env)
 ```
-VITE_API_URL=https://api.margine-space.com/api
+VITE_API_URL=https://api.margine-space.com
 ```
 
 ### Backend (.env)
@@ -41,7 +41,7 @@ pm2 start index.js
 The project is automatically deployed to Netlify when changes are pushed to the main branch.
 
 Required Netlify environment variables:
-- VITE_API_URL=https://api.margine-space.com/api
+- VITE_API_URL=https://api.margine-space.com
 
 ### Database Setup
 1. Create PostgreSQL database:
