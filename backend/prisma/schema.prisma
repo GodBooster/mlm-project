@@ -8,30 +8,29 @@ datasource db {
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  email        String        @unique
-  bonus        Float         @default(0)
-  createdAt    DateTime      @default(now())
-  balance      Float         @default(0)
-  password     String
-  rank         String        @default("BRONZE")
-  referralCode String        @unique
-  referredBy   String?
-  wallet       String?
-  avatar       String?
-  updatedAt    DateTime      @updatedAt
-  username     String        @unique
-  isAdmin      Boolean       @default(false)
-  isBlocked    Boolean       @default(false)
-  lastLogin    DateTime?     // дата и время последнего входа
-  investments  Investment[]
-  transactions Transaction[]
-  referrer     User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
-  referrals    User[]        @relation("ReferralRelation")
-  // --- Email verification fields ---
-  emailVerified           Boolean     @default(false)
-  emailVerificationToken  String?
+  id                       Int           @id @default(autoincrement())
+  email                    String        @unique
+  bonus                    Float         @default(0)
+  createdAt                DateTime      @default(now())
+  balance                  Float         @default(0)
+  password                 String
+  rank                     String        @default("BRONZE")
+  referralCode             String        @unique
+  referredBy               String?
+  updatedAt                DateTime      @updatedAt
+  username                 String        @unique
+  wallet                   String?
+  isAdmin                  Boolean       @default(false)
+  avatar                   String?
   emailVerificationExpires DateTime?
+  emailVerificationToken   String?
+  emailVerified            Boolean       @default(false)
+  isBlocked                Boolean       @default(false)
+  lastLogin                DateTime?
+  investments              Investment[]
+  transactions             Transaction[]
+  referrer                 User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
+  referrals                User[]        @relation("ReferralRelation")
 }
 
 model InvestmentPackage {
@@ -39,10 +38,10 @@ model InvestmentPackage {
   name         String       @unique
   minAmount    Float
   monthlyYield Float
-  percent      Float        @default(0)
   duration     Int
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
+  percent      Float        @default(0)
   investments  Investment[]
 }
 

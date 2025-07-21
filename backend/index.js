@@ -1,5 +1,5 @@
+import 'dotenv/config';
 import express from 'express'
-import cors from 'cors'
 import bcrypt from 'bcrypt'
 import multer from 'multer'
 import { PrismaClient } from '@prisma/client'
@@ -9,11 +9,48 @@ import referralService from './services/referral-service.js'
 import rankService from './services/rank-service.js'
 import rankRewardService, { MLM_RANKS } from './services/rank-reward-service.js'
 import { authenticateToken, generateToken } from './middleware/auth.js'
-import nodemailer from 'nodemailer';
-import crypto from 'crypto';
+import nodemailer from 'nodemailer'
+import crypto from 'crypto'
+import emailService from './services/email-service.js'
 
 const prisma = new PrismaClient()
 const app = express()
+
+// CORS middleware for development and production
+// Вынесите это ВНЕ функции и ВЫШЕ неё!
+const allowedOrigins = [
+  'https://margine-space.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'https://transgresse.netlify.app'
+];
+
+function corsHandler(req, res, next) {
+  const origin = req.headers.origin;
+  console.log('Origin:', origin, 'Allowed:', allowedOrigins.includes(origin));
+  
+  // Check if origin is allowed
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,Accept,Origin,User-Agent,X-Requested-With');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+}
+
+// Apply middlewares
+app.use(corsHandler);
+app.use(express.json());
 
 // Multer configuration for file uploads
 const storage = multer.memoryStorage()
@@ -29,32 +66,40 @@ const upload = multer({
       cb(new Error('Only image files are allowed'), false)
     }
   }
-})
+});
 
-// Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://invarifi.netlify.app',
-    'https://transgresse.netlify.app',
-    'https://invarifi.tech',
-    'https://www.invarifi.tech',
-    // Добавьте сюда ваш Netlify домен, если он отличается
-    process.env.FRONTEND_URL
-  ].filter(Boolean), // Убираем undefined значения
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}))
-app.use(express.json())
-
-// Start scheduler (no queue manager needed)
+// Start scheduler
 scheduler.start().catch(console.error)
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() })
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'MLM Backend is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: 'connected',
+    port: process.env.PORT || 3000,
+    version: '1.0.0',
+    env: process.env.NODE_ENV,
+    memory: process.memoryUsage()
+  })
+})
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'MLM Backend API',
+    version: '1.0.0',
+    documentation: '/api/docs',
+    endpoints: [
+      '/api/health',
+      '/api/packages',
+      '/api/users',
+      '/api/investments',
+      '/api/transactions'
+    ]
+  })
 })
 
 // Referral invite route - redirect to frontend
@@ -65,19 +110,20 @@ app.get('/invite/:code', (req, res) => {
 })
 
 // Email sending utility
+// Email sending utility
 async function sendVerificationEmail(to, code, token) {
-  // Настройка транспорта (пример для Gmail, заменить на свой SMTP)
+  // Настройка транспорта
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465,
+    port: parseInt(process.env.SMTP_PORT || '465'),
     secure: true,
     auth: {
-      user: process.env.SMTP_USER || 'your@email.com',
-      pass: process.env.SMTP_PASS || 'yourpassword',
-    },
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
   });
 
-  const verifyUrl = `https://api.invarifi.tech/api/verify-email?token=${token}`;
+  const verifyUrl = `https://margine-space.com/verify?token=${token}`;
   const html = `
   <!DOCTYPE html>
   <html lang="en">
@@ -390,8 +436,8 @@ app.post('/api/register', async (req, res) => {
       userData: { email, name: userName, password, referralId }
     })
 
-    // Отправляем письмо с кодом и ссылкой
-    await sendVerificationEmail(email, verificationCode, verificationToken)
+    // Use new email service
+    await emailService.sendVerificationEmail(email, verificationCode, verificationToken)
 
     res.json({ success: true, message: 'Verification code and link sent to your email' })
   } catch (error) {
@@ -461,9 +507,8 @@ app.post('/api/reset-password', async (req, res) => {
       }
     })
 
-    // In production, send email with reset link
-    // For now, just return success message
-    console.log(`Password reset requested for ${email}. Reset token: ${resetToken}`)
+    // Use new email service
+    await emailService.sendPasswordResetEmail(email, resetToken)
     
     res.json({ 
       success: true, 
@@ -502,6 +547,7 @@ app.post('/api/verify-email', async (req, res) => {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(userData.password, 10)
+    
 
     // Generate referral code
     const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -1133,6 +1179,7 @@ app.get('/api/users/:id', async (req, res) => {
 });
 
 // Investment packages routes
+/*
 app.get('/api/packages', async (req, res) => {
   try {
     const packages = await prisma.investmentPackage.findMany({
@@ -1155,6 +1202,7 @@ app.post('/api/packages', async (req, res) => {
     res.status(400).json({ error: error.message })
   }
 })
+*/
 
 // Transaction routes
 app.get('/api/transactions/user/:userId', async (req, res) => {
@@ -1546,11 +1594,11 @@ process.on('SIGINT', async () => {
   process.exit(0)
 })
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
   console.log('Queue system and scheduler started')
-}) 
+}); 
 
 // Добавить эндпоинт для получения инвестиций пользователя (только для админа)
 app.get('/api/admin/user/:id/investments', authenticateToken, async (req, res) => {
