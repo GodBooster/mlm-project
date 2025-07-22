@@ -1,3 +1,4 @@
+import cors from 'cors';
 import 'dotenv/config';
 import express from 'express'
 import bcrypt from 'bcrypt'
@@ -15,50 +16,35 @@ import emailService from './services/email-service.js'
 
 const prisma = new PrismaClient()
 const app = express()
+app.use(express.json());
 
-// CORS middleware for development and production
-// Вынесите это ВНЕ функции и ВЫШЕ неё!
+// Simple working CORS
 const allowedOrigins = [
   'https://margine-space.com',
+  'https://transgresse.netlify.app',
   'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'https://transgresse.netlify.app'
+  'http://localhost:3000'
 ];
 
-function corsHandler(req, res, next) {
+app.use((req, res, next) => {
   const origin = req.headers.origin;
-  console.log('Origin:', origin, 'Allowed:', allowedOrigins.includes(origin));
-  
-  // Check if origin is allowed
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
-  
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,Accept,Origin,User-Agent,X-Requested-With');
-  
-  // Handle preflight requests
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, Origin');
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
-  
   next();
-}
+});
 
-// Apply middlewares
-app.use(corsHandler);
-app.use(express.json());
-
-// Multer configuration for file uploads
+// Multer configuration
 const storage = multer.memoryStorage()
 const upload = multer({ 
   storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true)
@@ -68,7 +54,7 @@ const upload = multer({
   }
 });
 
-// Start scheduler
+// Start scheduler once
 scheduler.start().catch(console.error)
 
 // Health check endpoint

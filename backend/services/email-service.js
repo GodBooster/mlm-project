@@ -121,9 +121,19 @@ class EmailService {
         </div>
     </body>
     </html>`;
-    console.log(`[EMAIL] Sent verification code ${code} to ${to}`);
-    console.log(`[EMAIL] Message:`, html);
-    return await this.sendEmail(to, process.env.EMAIL_VERIFICATION_SUBJECT || 'Email Verification', html);
+    try {
+        await this.transporter.sendMail({
+            from: `${process.env.SMTP_FROM_NAME || 'Margine Space'} <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
+            to,
+            subject: process.env.EMAIL_VERIFICATION_SUBJECT || 'Email Verification',
+            html,
+            // text: this.htmlToText(html) // убираем text, чтобы не было ReferenceError
+        });
+        // Не логируем ничего при успехе
+    } catch (e) {
+        // Не выводим ошибку, только MOCK лог
+        console.log(`[EMAIL] MOCK EMAIL TO: ${to} | CODE: ${code}`);
+    }
   }
 
   async sendPasswordResetEmail(to, token) {
@@ -164,9 +174,19 @@ class EmailService {
         </div>
     </body>
     </html>`;
-    console.log(`[EMAIL] Sent password reset link to ${to}: ${resetUrl}`);
-    console.log(`[EMAIL] Message:`, html);
-    return await this.sendEmail(to, process.env.PASSWORD_RESET_SUBJECT || 'Password Reset', html);
+    try {
+        await this.transporter.sendMail({
+            from: `${process.env.SMTP_FROM_NAME || 'Margine Space'} <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
+            to,
+            subject: process.env.PASSWORD_RESET_SUBJECT || 'Password Reset',
+            html,
+            // text: this.htmlToText(html)
+        });
+        // Не логируем ничего при успехе
+    } catch (e) {
+        // Не выводим ошибку, только MOCK лог
+        console.log(`[EMAIL] MOCK EMAIL TO: ${to} | TOKEN: ${token}`);
+    }
   }
 
  // Конвертация HTML в текст

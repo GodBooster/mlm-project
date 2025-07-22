@@ -57,6 +57,73 @@ export default function AdminDashboard() {
   const [historyTransactions, setHistoryTransactions] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Найти место, где блок Recent Transactions:
+  // <Card>
+  //   <h3 className="text-xl font-semibold text-white mb-6">Recent Transactions</h3>
+  //   ...
+  // </Card>
+  // --- заменяем на:
+  const [selectedWithdrawals, setSelectedWithdrawals] = useState([]);
+  const [batchApproving, setBatchApproving] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Фильтруем заявки на вывод
+  const withdrawals = transactions.filter(tx => tx.type === 'WITHDRAWAL' && tx.status === 'PENDING');
+  const allSelected = withdrawals.length > 0 && selectedWithdrawals.length === withdrawals.length;
+
+  function extractWallet(description) {
+    // Ожидается формат 'Withdrawal to {wallet}'
+    if (!description) return '';
+    const match = description.match(/Withdrawal to (.+)/);
+    return match ? match[1] : '';
+  }
+  function toggleSelect(id) {
+    setSelectedWithdrawals(selectedWithdrawals =>
+      selectedWithdrawals.includes(id)
+        ? selectedWithdrawals.filter(x => x !== id)
+        : [...selectedWithdrawals, id]
+    );
+  }
+  function toggleSelectAll() {
+    if (allSelected) setSelectedWithdrawals([]);
+    else setSelectedWithdrawals(withdrawals.map(tx => tx.id));
+  }
+  async function handleApprove(id) {
+    setActionLoadingId(id);
+    await fetch(`${API}/api/admin/withdrawals/${id}/approve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setActionLoadingId(null);
+    loadData();
+  }
+  async function handleReject(id) {
+    setActionLoadingId(id);
+    await fetch(`${API}/api/admin/withdrawals/${id}/reject`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setActionLoadingId(null);
+    loadData();
+  }
+  async function handleHold(id) {
+    // Просто меняем статус на HOLD (если потребуется, реализовать на backend)
+    alert('Hold action not implemented yet');
+  }
+  async function handleBatchApprove() {
+    setBatchApproving(true);
+    // TODO: реализовать batch approve на backend, пока по одному
+    for (const id of selectedWithdrawals) {
+      await fetch(`${API}/api/admin/withdrawals/${id}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
+    setBatchApproving(false);
+    setSelectedWithdrawals([]);
+    loadData();
+  }
+
   useEffect(() => {
     if (!token) return;
     loadData();
@@ -411,38 +478,54 @@ export default function AdminDashboard() {
               </Card>
 
               <Card>
-                <h3 className="text-xl font-semibold text-white mb-6">Recent Transactions</h3>
+                <h3 className="text-xl font-semibold text-white mb-6">Withdrawal Panel</h3>
+                <div className="mb-4 flex items-center gap-2">
+                  <button
+                    className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                    disabled={selectedWithdrawals.length === 0 || batchApproving}
+                    onClick={handleBatchApprove}
+                  >
+                    {batchApproving ? 'Approving...' : `Approve Selected (${selectedWithdrawals.length})`}
+                  </button>
+                  <span className="text-gray-400 text-sm">Batch approve withdrawals</span>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-gray-900/80">
                       <tr className="text-gray-400 border-b border-gray-700">
+                        <th className="py-3 px-3"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /></th>
                         <th className="text-left py-3 px-3">Date</th>
                         <th className="text-left py-3 px-3">User</th>
-                        <th className="text-left py-3 px-3">Type</th>
                         <th className="text-left py-3 px-3">Amount</th>
+                        <th className="text-left py-3 px-3">Wallet</th>
                         <th className="text-left py-3 px-3">Status</th>
+                        <th className="text-left py-3 px-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.slice(0, 10).map((tx, i) => (
-                        <tr key={i} className="border-b border-gray-800">
-                          <td className="py-2 px-3 text-gray-300">
-                            {new Date(tx.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
-                          <td className="py-2 px-3 text-orange-400">{tx.type}</td>
-                          <td className="py-2 px-3 text-white">${Number(tx.amount).toFixed(2)}</td>
-                          <td className="py-2 px-3">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
-                              tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
-                              'bg-red-900/20 text-red-400'
-                            }`}>
-                              {tx.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {withdrawals.length === 0 ? (
+                        <tr><td colSpan={7} className="text-gray-400 text-center py-4">No pending withdrawals</td></tr>
+                      ) : (
+                        withdrawals.map((tx) => (
+                          <tr key={tx.id} className="border-b border-gray-800">
+                            <td className="py-2 px-3">
+                              <input type="checkbox" checked={selectedWithdrawals.includes(tx.id)} onChange={() => toggleSelect(tx.id)} />
+                            </td>
+                            <td className="py-2 px-3 text-gray-300">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                            <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
+                            <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
+                            <td className="py-2 px-3 text-white">{extractWallet(tx.description)}</td>
+                            <td className="py-2 px-3">
+                              <span className="px-2 py-1 rounded text-xs bg-yellow-900/20 text-yellow-400">{tx.status}</span>
+                            </td>
+                            <td className="py-2 px-3 flex gap-2">
+                              <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>Approve</button>
+                              <button className="bg-yellow-700 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleHold(tx.id)} disabled={actionLoadingId === tx.id}>Hold</button>
+                              <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>Reject</button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
