@@ -1384,14 +1384,14 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
 
 app.get('/api/admin/transactions', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // TODO: Add admin role check
     const transactions = await prisma.transaction.findMany({
       include: {
         user: {
           select: {
             id: true,
             email: true,
-            username: true
+            username: true,
+            wallet: true // добавлено!
           }
         }
       },
