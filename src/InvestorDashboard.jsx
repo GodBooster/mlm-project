@@ -48,6 +48,9 @@ const InvestorDashboard = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositLoading, setDepositLoading] = useState(false);
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
@@ -380,6 +383,74 @@ const InvestorDashboard = () => {
     }
   }, [token]);
 
+  const handleModalWithdraw = useCallback(async () => {
+    if (!modalAmount || isNaN(modalAmount) || Number(modalAmount) <= 0) {
+      alert('Enter a valid withdrawal amount!');
+      return;
+    }
+    setModalLoading(true);
+    try {
+      const res = await fetch(`${API}/api/withdraw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          amount: Number(modalAmount),
+          wallet: walletAddress
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUserData(u => ({ ...u, balance: data.balance }));
+        // Обновляем профиль пользователя после вывода
+        const profileRes = await fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
+        const profileData = await profileRes.json();
+        setUserData(profileData);
+        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(res => res.json()).then(setTransactions);
+        setShowWithdrawModal(false);
+        setModalAmount('');
+        setWalletAddress('');
+      } else {
+        alert(data.error || 'Withdrawal error');
+      }
+    } finally {
+      setModalLoading(false);
+    }
+  }, [modalAmount, walletAddress, token]);
+
+  const handleModalDeposit = useCallback(async () => {
+    if (!depositAmount || isNaN(depositAmount) || Number(depositAmount) <= 0) {
+      alert('Enter a valid deposit amount!');
+      return;
+    }
+    setDepositLoading(true);
+    try {
+      const res = await fetch(`${API}/api/deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ amount: Number(depositAmount) })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUserData(u => ({ ...u, balance: data.balance }));
+        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(res => res.json()).then(setTransactions);
+        setDepositOpen(false);
+        setDepositAmount('');
+      } else {
+        alert(data.error || 'Deposit error');
+      }
+    } finally {
+      setDepositLoading(false);
+    }
+  }, [depositAmount, token]);
+
   // Profile management functions
   const handleAvatarUpload = useCallback(async () => {
     if (!avatarFile) return;
@@ -643,7 +714,7 @@ const InvestorDashboard = () => {
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4">
-                        <button onClick={openDepositModal} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
+                        <button onClick={() => setDepositOpen(true)} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
                         <button onClick={() => setWithdrawOpen(true)} className="flex-1 inactive-button text-white py-2 px-4 rounded-lg">Withdraw</button>
                       </div>
                     </div>
@@ -1010,6 +1081,31 @@ const InvestorDashboard = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {depositOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDepositOpen(false)}>
+          <div className="bg-gray-900 rounded-2xl shadow-lg p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
+            <button className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold" onClick={() => setDepositOpen(false)} aria-label="Close">×</button>
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">Deposit Funds</h3>
+            <input
+              type="number"
+              min={1}
+              value={depositAmount}
+              onChange={e => setDepositAmount(e.target.value)}
+              className="w-full glass-input px-4 py-3 text-white focus:outline-none mb-4"
+              placeholder="Enter deposit amount"
+              disabled={depositLoading}
+            />
+            <button
+              onClick={handleModalDeposit}
+              className="w-full orange-button text-white py-3 rounded-lg mt-2 disabled:opacity-50"
+              disabled={depositLoading}
+            >
+              {depositLoading ? 'Processing...' : 'Deposit'}
+            </button>
           </div>
         </div>
       )}
