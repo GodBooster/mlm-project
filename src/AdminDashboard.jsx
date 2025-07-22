@@ -367,6 +367,26 @@ export default function AdminDashboard() {
       .reduce((sum, tx) => sum + Number(tx.amount), 0)
   };
 
+  const [editedWallets, setEditedWallets] = useState({});
+  const [savingWalletId, setSavingWalletId] = useState(null);
+  function handleWalletChange(userId, value) {
+    setEditedWallets(prev => ({ ...prev, [userId]: value }));
+  }
+  async function saveWallet(userId) {
+    if (editedWallets[userId] === undefined) return;
+    setSavingWalletId(userId);
+    await fetch(`${API}/api/admin/user/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ wallet: editedWallets[userId] })
+    });
+    setSavingWalletId(null);
+    loadData();
+  }
+
   if (!token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-900/20 via-gray-900 to-black flex items-center justify-center">
@@ -514,7 +534,17 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 text-gray-300">{new Date(tx.createdAt).toLocaleDateString()}</td>
                             <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
                             <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
-                            <td className="py-2 px-3 text-white">{extractWallet(tx.description)}</td>
+                            <td className="py-2 px-3 text-white">
+                              <input
+                                type="text"
+                                value={editedWallets[tx.user.id] !== undefined ? editedWallets[tx.user.id] : (tx.user.wallet || '')}
+                                onChange={e => handleWalletChange(tx.user.id, e.target.value)}
+                                onBlur={() => saveWallet(tx.user.id)}
+                                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white w-40 focus:border-orange-500 focus:outline-none"
+                                disabled={savingWalletId === tx.user.id}
+                              />
+                              {savingWalletId === tx.user.id && <span className="ml-2 text-xs text-orange-400">Saving...</span>}
+                            </td>
                             <td className="py-2 px-3">
                               <span className="px-2 py-1 rounded text-xs bg-yellow-900/20 text-yellow-400">{tx.status}</span>
                             </td>
