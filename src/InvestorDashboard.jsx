@@ -485,6 +485,10 @@ const InvestorDashboard = () => {
       const data = await res.json();
       if (res.ok) {
         setUserData(u => ({ ...u, balance: data.balance }));
+        // Обновляем профиль пользователя после вывода
+        const profileRes = await fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
+        const profileData = await profileRes.json();
+        setUserData(profileData);
         fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
           .then(res => res.json()).then(setTransactions);
       } else {
