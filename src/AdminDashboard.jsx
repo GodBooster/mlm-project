@@ -110,6 +110,15 @@ export default function AdminDashboard() {
     // Просто меняем статус на HOLD (если потребуется, реализовать на backend)
     alert('Hold action not implemented yet');
   }
+  async function handleCheck(id) {
+    setActionLoadingId(id);
+    await fetch(`${API}/api/admin/withdrawals/${id}/check`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setActionLoadingId(null);
+    loadData();
+  }
   async function handleBatchApprove() {
     setBatchApproving(true);
     // TODO: реализовать batch approve на backend, пока по одному
@@ -570,11 +579,23 @@ export default function AdminDashboard() {
                               >Edit Wallet</button>
                             </td>
                             <td className="py-2 px-3">
-                              <span className="px-2 py-1 rounded text-xs bg-yellow-900/20 text-yellow-400">{tx.status}</span>
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
+                                tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
+                                tx.status === 'CHECK' ? 'bg-orange-900/20 text-orange-400' :
+                                tx.status === 'REJECTED' ? 'bg-red-900/20 text-red-400' :
+                                'bg-gray-700/20 text-gray-400'
+                              }`}>
+                                {tx.status === 'CHECK' ? 'Check' :
+                                tx.status === 'REJECTED' ? 'Rejected' :
+                                tx.status === 'COMPLETED' ? 'Completed' :
+                                tx.status === 'PENDING' ? 'Pending' :
+                                tx.status}
+                              </span>
                             </td>
                             <td className="py-2 px-3 flex gap-2">
                               <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>Approve</button>
-                              <button className="bg-yellow-700 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleHold(tx.id)} disabled={actionLoadingId === tx.id}>Hold</button>
+                              <button className="bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleCheck(tx.id)} disabled={actionLoadingId === tx.id}>Check</button>
                               <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>Reject</button>
                             </td>
                           </tr>
