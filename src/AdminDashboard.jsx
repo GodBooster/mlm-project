@@ -388,6 +388,33 @@ export default function AdminDashboard() {
     await loadData(); // обязательно ждем обновления данных
   }
 
+  const [walletModalUser, setWalletModalUser] = useState(null);
+  const [walletModalValue, setWalletModalValue] = useState('');
+  const [walletModalSaving, setWalletModalSaving] = useState(false);
+  function openWalletModal(user) {
+    setWalletModalUser(user);
+    setWalletModalValue(user.wallet || '');
+  }
+  function closeWalletModal() {
+    setWalletModalUser(null);
+    setWalletModalValue('');
+  }
+  async function saveWalletModal() {
+    if (!walletModalUser) return;
+    setWalletModalSaving(true);
+    await fetch(`${API}/api/admin/user/${walletModalUser.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ wallet: walletModalValue })
+    });
+    setWalletModalSaving(false);
+    closeWalletModal();
+    await loadData();
+  }
+
   if (!token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-900/20 via-gray-900 to-black flex items-center justify-center">
@@ -535,16 +562,12 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 text-gray-300">{new Date(tx.createdAt).toLocaleDateString()}</td>
                             <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
                             <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
-                            <td className="py-2 px-3 text-white">
-                              <input
-                                type="text"
-                                value={editedWallets[tx.user.id] !== undefined ? editedWallets[tx.user.id] : (tx.user.wallet || '')}
-                                onChange={e => handleWalletChange(tx.user.id, e.target.value)}
-                                onBlur={() => saveWallet(tx.user.id)}
-                                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white w-40 focus:border-orange-500 focus:outline-none"
-                                disabled={savingWalletId === tx.user.id}
-                              />
-                              {savingWalletId === tx.user.id && <span className="ml-2 text-xs text-orange-400">Saving...</span>}
+                            <td className="py-2 px-3 text-white flex items-center gap-2">
+                              <span>{tx.user.wallet || '-'}</span>
+                              <button
+                                className="text-blue-400 hover:text-blue-300 text-xs underline"
+                                onClick={() => openWalletModal(tx.user)}
+                              >Edit Wallet</button>
                             </td>
                             <td className="py-2 px-3">
                               <span className="px-2 py-1 rounded text-xs bg-yellow-900/20 text-yellow-400">{tx.status}</span>
@@ -1109,6 +1132,40 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {walletModalUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-8 rounded-2xl max-w-md w-full relative">
+            <button
+              type="button"
+              onClick={closeWalletModal}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold focus:outline-none"
+              aria-label="Close"
+            >×</button>
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">Edit Wallet</h3>
+            <div className="mb-4">
+              <label className="block text-gray-300 mb-1">Wallet</label>
+              <input
+                type="text"
+                value={walletModalValue}
+                onChange={e => setWalletModalValue(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-4">
+              <button
+                onClick={saveWalletModal}
+                disabled={walletModalSaving}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+              >{walletModalSaving ? 'Saving...' : 'Save'}</button>
+              <button
+                onClick={closeWalletModal}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
+              >Cancel</button>
+            </div>
           </div>
         </div>
       )}
