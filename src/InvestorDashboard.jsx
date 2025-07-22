@@ -369,6 +369,10 @@ const InvestorDashboard = () => {
   }, [modalAmount, closeModal]);
 
   const handleModalWithdraw = useCallback(async () => {
+    if (!walletAddress || walletAddress.trim() === '') {
+      alert('Please enter your wallet address!');
+      return;
+    }
     setModalLoading(true);
     await handleWithdraw(modalAmount);
     setModalLoading(false);
@@ -882,10 +886,6 @@ const InvestorDashboard = () => {
                           <td className="py-2 whitespace-nowrap">
                             {tx.status === 'PENDING' ? (
                               <span className="px-2 py-1 bg-yellow-600/20 text-yellow-400 rounded-full text-xs">
-                                {tx.status}
-                              </span>
-                            ) : tx.status === 'COMPLETED' ? (
-                              <span className="px-2 py-1 bg-green-600/20 text-green-400 rounded-full text-xs">
                                 {tx.status}
                               </span>
                             ) : tx.status === 'REJECTED' || tx.status === 'FAILED' ? (
