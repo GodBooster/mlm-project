@@ -384,7 +384,8 @@ export default function AdminDashboard() {
       body: JSON.stringify({ wallet: editedWallets[userId] })
     });
     setSavingWalletId(null);
-    loadData();
+    setEditedWallets(prev => { const copy = { ...prev }; delete copy[userId]; return copy; });
+    await loadData(); // обязательно ждем обновления данных
   }
 
   if (!token) {
