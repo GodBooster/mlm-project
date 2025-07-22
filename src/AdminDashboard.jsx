@@ -95,7 +95,7 @@ export default function AdminDashboard() {
       headers: { Authorization: `Bearer ${token}` }
     });
     setActionLoadingId(null);
-    loadData();
+    await loadData();
   }
   async function handleReject(id) {
     setActionLoadingId(id);
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       headers: { Authorization: `Bearer ${token}` }
     });
     setActionLoadingId(null);
-    loadData();
+    await loadData();
   }
   async function handleHold(id) {
     // Просто меняем статус на HOLD (если потребуется, реализовать на backend)
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
       headers: { Authorization: `Bearer ${token}` }
     });
     setActionLoadingId(null);
-    loadData();
+    await loadData();
   }
   async function handleBatchApprove() {
     setBatchApproving(true);
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
     }
     setBatchApproving(false);
     setSelectedWithdrawals([]);
-    loadData();
+    await loadData();
   }
 
   useEffect(() => {
@@ -141,6 +141,8 @@ export default function AdminDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Очищаем кэш fetch (если есть)
+      // await new Promise(r => setTimeout(r, 100)); // можно раскомментировать для форса
       const [usersRes, transactionsRes, packagesRes] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${import.meta.env.VITE_API_URL}/api/admin/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -219,7 +221,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         setShowEditModal(false);
         setEditingPackage(null);
-        loadData(); // Reload data
+        await loadData(); // Reload data
       } else {
         const error = await res.json();
         alert(error.error || 'Failed to save package');
@@ -246,7 +248,7 @@ export default function AdminDashboard() {
       });
       
       if (res.ok) {
-        loadData(); // Reload data
+        await loadData(); // Reload data
       } else {
         const error = await res.json();
         alert(error.error || 'Failed to delete package');
