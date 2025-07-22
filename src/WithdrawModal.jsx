@@ -6,7 +6,7 @@ export default function WithdrawModal({
   onWithdraw,
   balance,
   savedWallet,
-  minAmount = 1,
+  minAmount = 50,
   maxWalletLength = 50,
 }) {
   const [amount, setAmount] = useState('');
