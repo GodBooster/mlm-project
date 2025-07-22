@@ -369,10 +369,6 @@ const InvestorDashboard = () => {
   }, [modalAmount, closeModal]);
 
   const handleModalWithdraw = useCallback(async () => {
-    if (!walletAddress || walletAddress.trim() === '') {
-      alert('Please enter your wallet address!');
-      return;
-    }
     setModalLoading(true);
     await handleWithdraw(modalAmount);
     setModalLoading(false);
