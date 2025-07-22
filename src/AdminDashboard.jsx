@@ -563,7 +563,7 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
                             <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
                             <td className="py-2 px-3 text-white flex items-center gap-2">
-                              <span>{tx.user.wallet || '-'}</span>
+                              <span>{extractWallet(tx.description) || '-'}</span>
                               <button
                                 className="text-blue-400 hover:text-blue-300 text-xs underline"
                                 onClick={() => openWalletModal(tx.user)}
