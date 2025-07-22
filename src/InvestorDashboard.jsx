@@ -866,58 +866,91 @@ const InvestorDashboard = () => {
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <button onClick={openDepositModal} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
+                    <button onClick={() => setDepositOpen(true)} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
                     <button onClick={() => setWithdrawOpen(true)} className="inactive-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Withdraw</button>
                   </div>
                 </Card>
                 {/* Transaction History Table */}
                 <Card>
-                  <h3 className="text-lg font-semibold text-white mb-3">Transaction History</h3>
-                  <div className="overflow-x-auto max-h-[460px] sm:max-h-[calc(100vh-300px)] overflow-y-auto -mx-6 px-6">
-                  <table className="w-full text-xs sm:text-sm">
-                    <thead className="sticky top-0 bg-gray-900/80">
-                      <tr className="text-gray-400 border-b border-gray-700">
-                          <th className="text-left py-3 px-3 whitespace-nowrap">Date</th>
-                          <th className="text-left py-3 px-3 whitespace-nowrap">Type</th>
-                          <th className="text-left py-3 px-3 whitespace-nowrap">Amount</th>
-                          <th className="text-left py-3 px-3 whitespace-nowrap">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.filter(tx => tx.type !== 'Deposit address').map((tx, i) => (
-                        <tr key={i} className="border-b border-gray-800">
-                          <td className="py-2 pr-2 text-gray-300 whitespace-nowrap">
-                            {new Date(tx.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="py-2 pr-2 text-orange-400 whitespace-normal break-words max-w-[130px]">
-                            {tx.type === 'DAILY_PROFIT' && tx.investmentId ? `${tx.type} (${packages.find(p => p.id === tx.investment?.packageId)?.name || 'Unknown'})` :
-                             tx.type === 'BONUS' && tx.investmentId ? `${tx.type} (${packages.find(p => p.id === tx.investment?.packageId)?.name || 'Unknown'} package)` :
-                             tx.type === 'INVESTMENT' && tx.investmentId ? `${tx.type} (${packages.find(p => p.id === tx.investment?.packageId)?.name || 'Unknown'})` :
-                             tx.type === 'RANK_REWARD' && tx.description ? `${tx.type} (${tx.description})` :
-                             tx.type === 'WITHDRAWAL' && tx.description ? `${tx.type} (${tx.description.replace('Withdrawal to ', '')})` :
-                             tx.type}
-                          </td>
-                          <td className="py-2 pr-2 text-white whitespace-nowrap">
-                            ${Number(tx.amount).toFixed(2)}
-                          </td>
-                          <td className="py-2 whitespace-nowrap">
-                            {tx.status === 'PENDING' ? (
-                              <span className="px-2 py-1 bg-yellow-600/20 text-yellow-400 rounded-full text-xs">
-                                {tx.status}
-                              </span>
-                            ) : tx.status === 'REJECTED' || tx.status === 'FAILED' ? (
-                              <span className="px-2 py-1 bg-red-600/20 text-red-400 rounded-full text-xs">
-                                REJECTED
-                              </span>
-                            ) : (
-                              <span className="text-green-400">{tx.status}</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold text-white mb-1">Transaction History</h3>
+                    <p className="text-gray-300 opacity-70 text-sm">View your recent transaction activity</p>
                   </div>
+                  <div className="overflow-x-auto">
+                    <div className="max-h-[400px] overflow-y-auto rounded-xl border border-white/10 bg-white/5">
+                      <table className="min-w-full text-sm">
+                        <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+                          <tr>
+                            <th className="py-3 px-4 text-left font-semibold text-white uppercase">Date</th>
+                            <th className="py-3 px-4 text-left font-semibold text-white uppercase">Type</th>
+                            <th className="py-3 px-4 text-left font-semibold text-white uppercase">Amount</th>
+                            <th className="py-3 px-4 text-left font-semibold text-white uppercase">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {transactions.filter(tx => tx.type !== 'Deposit address').map((tx, i) => (
+                            <tr
+                              key={i}
+                              className={`transition-all duration-200 ${i % 2 === 0 ? 'bg-white/10 hover:bg-cyan-400/10' : 'bg-white/5 hover:bg-cyan-400/15'}`}
+                            >
+                              <td className="py-3 px-4 text-gray-200">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                              <td className={`py-3 px-4 font-semibold ${tx.type === 'DEPOSIT' ? 'text-green-400' : 'text-orange-400'}`}>{tx.type}
+                                {tx.type === 'WITHDRAWAL' && tx.description && (
+                                  <div
+                                    className="wallet-address text-xs text-gray-300 font-mono opacity-70 max-w-[180px] truncate cursor-pointer"
+                                    title="Click to copy"
+                                    onClick={() => tx.description && navigator.clipboard.writeText(tx.description.replace('Withdrawal to ', ''))}
+                                  >
+                                    {tx.description.replace('Withdrawal to ', '')}
+                                  </div>
+                                )}
+                              </td>
+                              <td className={`py-3 px-4 font-mono font-bold ${tx.type === 'DEPOSIT' ? 'text-green-400' : 'text-orange-400'}`}>${Number(tx.amount).toFixed(2)}</td>
+                              <td className="py-3 px-4">
+                                <span
+                                  className={`inline-flex items-center px-3 py-1 rounded-full font-semibold text-xs uppercase
+                                    ${tx.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                                      tx.status === 'PENDING' ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/30 animate-pulse' :
+                                      tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : ''}`}
+                                >
+                                  {tx.status === 'PENDING' ? (
+                                    <>
+                                      Pending
+                                      <span className="ml-1 loading-dot bg-yellow-400"></span>
+                                      <span className="loading-dot bg-yellow-400"></span>
+                                      <span className="loading-dot bg-yellow-400"></span>
+                                    </>
+                                  ) : tx.status === 'COMPLETED' ? (
+                                    'Completed'
+                                  ) : tx.status === 'REJECTED' || tx.status === 'FAILED' ? (
+                                    'Rejected'
+                                  ) : (
+                                    tx.status
+                                  )}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <style>{`
+                    .loading-dot {
+                      display: inline-block;
+                      width: 4px;
+                      height: 4px;
+                      border-radius: 50%;
+                      margin: 0 1px;
+                      animation: loading 1.4s infinite ease-in-out;
+                    }
+                    .loading-dot:nth-child(2) { animation-delay: -0.32s; }
+                    .loading-dot:nth-child(3) { animation-delay: -0.16s; }
+                    @keyframes loading {
+                      0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+                      40% { transform: scale(1); opacity: 1; }
+                    }
+                  `}</style>
                 </Card>
               </div>
             )}
@@ -1085,6 +1118,7 @@ const InvestorDashboard = () => {
         </div>
       )}
 
+      {/* Deposit Modal (современный, как в дашборде) */}
       {depositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDepositOpen(false)}>
           <div className="bg-gray-900 rounded-2xl shadow-lg p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
@@ -1110,6 +1144,7 @@ const InvestorDashboard = () => {
         </div>
       )}
 
+      {/* Withdraw Modal (унифицированный) */}
       <WithdrawModal
         isOpen={withdrawOpen}
         onClose={() => setWithdrawOpen(false)}
