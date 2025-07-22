@@ -369,11 +369,15 @@ const InvestorDashboard = () => {
   }, [modalAmount, closeModal]);
 
   const handleModalWithdraw = useCallback(async () => {
+    if (!walletAddress || walletAddress.trim() === '' || walletAddress.length > 50) {
+      alert('Please enter a valid wallet address (1-50 characters)!');
+      return;
+    }
     setModalLoading(true);
     await handleWithdraw(modalAmount);
     setModalLoading(false);
     closeModal();
-  }, [modalAmount, closeModal]);
+  }, [modalAmount, walletAddress, handleWithdraw, closeModal]);
 
   // Profile management functions
   const handleAvatarUpload = useCallback(async () => {
