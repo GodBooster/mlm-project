@@ -884,6 +884,10 @@ const InvestorDashboard = () => {
                               <span className="px-2 py-1 bg-green-600/20 text-green-400 rounded-full text-xs">
                                 {tx.status}
                               </span>
+                            ) : tx.status === 'REJECTED' ? (
+                              <span className="px-2 py-1 bg-red-600/20 text-red-400 rounded-full text-xs">
+                                Rejected
+                              </span>
                             ) : (
                               <span className="text-green-400">{tx.status}</span>
                             )}

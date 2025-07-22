@@ -735,9 +735,10 @@ export default function AdminDashboard() {
                           <span className={`px-2 py-1 rounded text-xs ${
                             tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
                             tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
-                            'bg-red-900/20 text-red-400'
+                            tx.status === 'REJECTED' ? 'bg-red-900/20 text-red-400' :
+                            'bg-gray-700/20 text-gray-400'
                           }`}>
-                            {tx.status}
+                            {tx.status === 'REJECTED' ? 'Rejected' : tx.status}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-gray-300 max-w-[200px] truncate" title={tx.description}>
@@ -1155,9 +1156,10 @@ export default function AdminDashboard() {
                             <span className={`px-2 py-1 rounded text-xs ${
                               tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
                               tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
-                              'bg-red-900/20 text-red-400'
+                              tx.status === 'REJECTED' ? 'bg-red-900/20 text-red-400' :
+                              'bg-gray-700/20 text-gray-400'
                             }`}>
-                              {tx.status}
+                              {tx.status === 'REJECTED' ? 'Rejected' : tx.status}
                             </span>
                           </td>
                         </tr>
