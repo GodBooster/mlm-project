@@ -623,7 +623,7 @@ export default function AdminDashboard() {
                                 'bg-gray-700/20 text-gray-400'
                               }`}>
                                 {tx.status === 'CHECK' ? 'Check' :
-                                tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'Rejected' :
+                                tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'REJECTED' :
                                 tx.status === 'COMPLETED' ? 'Completed' :
                                 tx.status === 'PENDING' ? 'Pending' :
                                 tx.status}
@@ -770,7 +770,7 @@ export default function AdminDashboard() {
                             tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-900/20 text-red-400' :
                             'bg-gray-700/20 text-gray-400'
                           }`}>
-                            {tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'Rejected' : tx.status}
+                            {tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'REJECTED' : tx.status}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-gray-300 max-w-[200px] truncate" title={tx.description}>
@@ -1191,7 +1191,7 @@ export default function AdminDashboard() {
                               tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-900/20 text-red-400' :
                               'bg-gray-700/20 text-gray-400'
                             }`}>
-                              {tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'Rejected' : tx.status}
+                              {tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'REJECTED' : tx.status}
                             </span>
                           </td>
                         </tr>

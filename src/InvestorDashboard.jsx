@@ -351,8 +351,8 @@ const InvestorDashboard = () => {
   const openWithdrawModal = useCallback(() => { 
     setShowWithdrawModal(true); 
     setModalAmount(''); 
-    setWalletAddress('');
-  }, []);
+    setWalletAddress(userData?.wallet || ''); // <-- теперь подставляем сохранённый кошелек
+  }, [userData]);
 
   const closeModal = useCallback(() => { 
     setShowDepositModal(false); 
@@ -886,7 +886,7 @@ const InvestorDashboard = () => {
                               </span>
                             ) : tx.status === 'REJECTED' || tx.status === 'FAILED' ? (
                               <span className="px-2 py-1 bg-red-600/20 text-red-400 rounded-full text-xs">
-                                Rejected
+                                REJECTED
                               </span>
                             ) : (
                               <span className="text-green-400">{tx.status}</span>
