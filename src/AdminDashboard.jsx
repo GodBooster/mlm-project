@@ -67,8 +67,13 @@ export default function AdminDashboard() {
   const [batchApproving, setBatchApproving] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // Фильтруем заявки на вывод
-  const withdrawals = transactions.filter(tx => tx.type === 'WITHDRAWAL' && tx.status === 'PENDING');
+  // Фильтруем заявки на вывод:
+  // Было:
+  // const withdrawals = transactions.filter(tx => tx.type === 'WITHDRAWAL' && tx.status === 'PENDING');
+  // Стало:
+  const withdrawals = transactions.filter(
+    tx => tx.type === 'WITHDRAWAL' && (tx.status === 'PENDING' || tx.status === 'CHECK')
+  );
   const allSelected = withdrawals.length > 0 && selectedWithdrawals.length === withdrawals.length;
 
   function extractWallet(description) {
