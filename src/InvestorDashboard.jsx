@@ -5,7 +5,7 @@ import InvestmentPackagesPage from './InvestmentPackagesPage';
 import ReferralSystemPage from './ReferralSystemPage';
 import TeamPage from './TeamPage';
 import RankRewardsPage from './RankRewardsPage';
-
+import WithdrawModal from './WithdrawModal';
 
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -47,6 +47,7 @@ const InvestorDashboard = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
@@ -348,36 +349,36 @@ const InvestorDashboard = () => {
     setModalAmount(''); 
   }, []);
 
-  const openWithdrawModal = useCallback(() => { 
-    setShowWithdrawModal(true); 
-    setModalAmount(''); 
-    setWalletAddress(userData?.wallet || ''); // <-- теперь подставляем сохранённый кошелек
-  }, [userData]);
-
-  const closeModal = useCallback(() => { 
-    setShowDepositModal(false); 
-    setShowWithdrawModal(false); 
-    setModalAmount(''); 
-    setWalletAddress('');
-  }, []);
-
-  const handleModalDeposit = useCallback(async () => {
-    setModalLoading(true);
-    await handleDeposit(modalAmount);
-    setModalLoading(false);
-    closeModal();
-  }, [modalAmount, closeModal]);
-
-  const handleModalWithdraw = useCallback(async () => {
-    if (!walletAddress || walletAddress.trim() === '') {
-      alert('Please enter your wallet address!');
-      return;
+  const handleWithdrawModal = useCallback(async (amount, wallet) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/withdraw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          amount: Number(amount),
+          wallet: wallet
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUserData(u => ({ ...u, balance: data.balance }));
+        // Обновляем профиль пользователя после вывода
+        const profileRes = await fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
+        const profileData = await profileRes.json();
+        setUserData(profileData);
+        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(res => res.json()).then(setTransactions);
+      } else {
+        alert(data.error || 'Withdrawal error');
+      }
+    } finally {
+      setLoading(false);
     }
-    setModalLoading(true);
-    await handleWithdraw(modalAmount);
-    setModalLoading(false);
-    closeModal();
-  }, [modalAmount, walletAddress, handleWithdraw, closeModal]);
+  }, [token]);
 
   // Profile management functions
   const handleAvatarUpload = useCallback(async () => {
@@ -447,61 +448,6 @@ const InvestorDashboard = () => {
     }
     setProfileLoading(false);
   }, [currentPassword, newPassword, confirmPassword, token]);
-
-  // --- Deposit/Withdraw logic ---
-  const handleDeposit = async (amount) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/deposit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ amount: Number(amount) })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setUserData(u => ({ ...u, balance: data.balance }));
-        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
-          .then(res => res.json()).then(setTransactions);
-      } else {
-        alert(data.error || 'Deposit error');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleWithdraw = async (amount) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/withdraw`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          amount: Number(amount),
-          wallet: walletAddress
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setUserData(u => ({ ...u, balance: data.balance }));
-        // Обновляем профиль пользователя после вывода
-        const profileRes = await fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
-        const profileData = await profileRes.json();
-        setUserData(profileData);
-        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
-          .then(res => res.json()).then(setTransactions);
-      } else {
-        alert(data.error || 'Withdrawal error');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // --- Invest logic ---
   const handleInvest = async (pkg) => {
@@ -698,7 +644,7 @@ const InvestorDashboard = () => {
                       </div>
                       <div className="flex gap-2 pt-4">
                         <button onClick={openDepositModal} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
-                        <button onClick={openWithdrawModal} className="flex-1 inactive-button text-white py-2 px-4 rounded-lg">Withdraw</button>
+                        <button onClick={() => setWithdrawOpen(true)} className="flex-1 inactive-button text-white py-2 px-4 rounded-lg">Withdraw</button>
                       </div>
                     </div>
                   </Card>
@@ -850,7 +796,7 @@ const InvestorDashboard = () => {
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <button onClick={openDepositModal} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
-                    <button onClick={openWithdrawModal} className="inactive-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Withdraw</button>
+                    <button onClick={() => setWithdrawOpen(true)} className="inactive-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Withdraw</button>
                   </div>
                 </Card>
                 {/* Transaction History Table */}
@@ -1067,6 +1013,14 @@ const InvestorDashboard = () => {
           </div>
         </div>
       )}
+
+      <WithdrawModal
+        isOpen={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        onWithdraw={handleWithdrawModal}
+        balance={userData.balance}
+        savedWallet={userData.wallet}
+      />
     </div>
   );
 };
