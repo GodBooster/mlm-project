@@ -3,7 +3,7 @@ import 'dotenv/config';
 import express from 'express'
 import bcrypt from 'bcrypt'
 import multer from 'multer'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, TransactionStatus } from '@prisma/client'
 import scheduler from './jobs/scheduler.js'
 import investmentService from './services/investment-service.js'
 import referralService from './services/referral-service.js'
@@ -762,7 +762,8 @@ app.post('/api/withdraw', authenticateToken, async (req, res) => {
         type: 'WITHDRAWAL',
         amount: parseFloat(amount),
         description: `Withdrawal to ${wallet}`,
-        status: 'PENDING'
+        status: 'PENDING',
+        wallet: wallet || null // сохраняем кошелек в поле wallet
       }
     })
 
@@ -1397,7 +1398,7 @@ app.get('/api/admin/transactions', authenticateToken, requireAdmin, async (req, 
       },
       orderBy: { createdAt: 'desc' }
     })
-    res.json(transactions)
+    res.json(transactions) // теперь каждое tx содержит поле wallet
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -1540,13 +1541,12 @@ app.post('/api/admin/withdrawals/:id/approve', authenticateToken, requireAdmin, 
 
 app.post('/api/admin/withdrawals/:id/reject', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // TODO: Add admin role check
     const { id } = req.params
     const transaction = await prisma.transaction.findUnique({
       where: { id: parseInt(id) }
     })
     
-    if (transaction && transaction.status === 'PENDING') {
+    if (transaction && (transaction.status === 'PENDING')) {
       // Refund the user's balance
       await prisma.user.update({
         where: { id: transaction.userId },
@@ -1555,12 +1555,13 @@ app.post('/api/admin/withdrawals/:id/reject', authenticateToken, requireAdmin, a
       
       await prisma.transaction.update({
         where: { id: parseInt(id) },
-        data: { status: 'FAILED' }
+        data: { status: TransactionStatus.FAILED }
       })
     }
     
     res.json({ success: true })
   } catch (error) {
+    console.error('[REJECT ENDPOINT ERROR]', error);
     res.status(500).json({ error: error.message })
   }
 })
@@ -1718,5 +1719,35 @@ app.put('/api/admin/user/:id/unblock', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Admin unblock user error:', error);
     res.status(500).json({ error: 'Failed to unblock user' });
+  }
+}); 
+
+// Добавить эндпоинт для редактирования кошелька заявки:
+app.put('/api/admin/withdrawals/:id/wallet', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { wallet } = req.body;
+    const tx = await prisma.transaction.update({
+      where: { id: parseInt(id) },
+      data: { wallet }
+    });
+    res.json({ success: true, transaction: tx });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}); 
+
+// Добавить эндпоинт для смены статуса на CHECK (ручная проверка):
+app.put('/api/admin/withdrawals/:id/hold', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = await prisma.transaction.update({
+      where: { id: parseInt(id) },
+      data: { status: TransactionStatus.FAILED }
+    });
+    res.json({ success: true, transaction: tx });
+  } catch (error) {
+    console.error('[HOLD ENDPOINT ERROR]', error);
+    res.status(500).json({ error: error.message });
   }
 }); 

@@ -72,6 +72,7 @@ model Transaction {
   createdAt    DateTime          @default(now())
   investment   Investment?       @relation(fields: [investmentId], references: [id])
   user         User              @relation(fields: [userId], references: [id])
+  wallet       String?           // добавлено: кошелек для этой транзакции
 }
 
 enum TransactionType {
