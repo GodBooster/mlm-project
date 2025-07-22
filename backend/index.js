@@ -763,7 +763,7 @@ app.post('/api/withdraw', authenticateToken, async (req, res) => {
         amount: parseFloat(amount),
         description: `Withdrawal to ${wallet}`,
         status: 'PENDING',
-        wallet: wallet || null // сохраняем кошелек в поле wallet
+        wallet: wallet || '' // сохраняем кошелек в поле wallet
       }
     })
 
