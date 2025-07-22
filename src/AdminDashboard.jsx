@@ -611,7 +611,7 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
                             {/* Откат: только tx.wallet */}
                             <td className="py-2 px-3 text-white flex items-center gap-2">
-                              <span>{tx.wallet}</span>
+                              <span>{tx.wallet || tx.user?.wallet || '-'}</span>
                               <button className="text-blue-400 hover:text-blue-300 text-xs underline" onClick={() => openWalletModal(tx.user)}>Edit Wallet</button>
                             </td>
                             <td className="py-2 px-3">
