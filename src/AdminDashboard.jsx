@@ -146,6 +146,20 @@ export default function AdminDashboard() {
     console.log('transactionsData:', transactions);
   }
 
+  // Добавить функцию handleBatchReject
+  async function handleBatchReject() {
+    setBatchApproving(true);
+    for (const id of selectedWithdrawals) {
+      await fetch(`${API}/api/admin/withdrawals/${id}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
+    setBatchApproving(false);
+    setSelectedWithdrawals([]);
+    await loadData();
+  }
+
   useEffect(() => {
     if (!token) return;
     loadData();
@@ -557,6 +571,23 @@ export default function AdminDashboard() {
                   <div className="text-gray-400 text-center py-4">No pending withdrawals</div>
                 ) : (
                   <div className="overflow-x-auto">
+                    {/* Массовые кнопки */}
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        className="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-xs disabled:opacity-50"
+                        onClick={handleBatchApprove}
+                        disabled={selectedWithdrawals.length === 0 || batchApproving}
+                      >
+                        {batchApproving ? 'Processing...' : 'Approve Selected'}
+                      </button>
+                      <button
+                        className="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-xs disabled:opacity-50"
+                        onClick={handleBatchReject}
+                        disabled={selectedWithdrawals.length === 0 || batchApproving}
+                      >
+                        {batchApproving ? 'Processing...' : 'Reject Selected'}
+                      </button>
+                    </div>
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 bg-gray-900/80">
                         <tr className="text-gray-400 border-b border-gray-700">
@@ -578,8 +609,9 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 text-gray-300">{new Date(tx.createdAt).toLocaleDateString()}</td>
                             <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
                             <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
+                            {/* Откат: только tx.wallet */}
                             <td className="py-2 px-3 text-white flex items-center gap-2">
-                              <span>{tx.wallet || extractWallet(tx.description) || '-'}</span>
+                              <span>{tx.wallet}</span>
                               <button className="text-blue-400 hover:text-blue-300 text-xs underline" onClick={() => openWalletModal(tx.user)}>Edit Wallet</button>
                             </td>
                             <td className="py-2 px-3">
