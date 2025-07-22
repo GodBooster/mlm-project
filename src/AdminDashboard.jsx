@@ -546,36 +546,27 @@ export default function AdminDashboard() {
                 </div>
               </Card>
 
+              {/* Новый Withdrawal Panel: */}
               <Card>
                 <h3 className="text-xl font-semibold text-white mb-6">Withdrawal Panel</h3>
-                <div className="mb-4 flex items-center gap-2">
-                  <button
-                    className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
-                    disabled={selectedWithdrawals.length === 0 || batchApproving}
-                    onClick={handleBatchApprove}
-                  >
-                    {batchApproving ? 'Approving...' : `Approve Selected (${selectedWithdrawals.length})`}
-                  </button>
-                  <span className="text-gray-400 text-sm">Batch approve withdrawals</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-gray-900/80">
-                      <tr className="text-gray-400 border-b border-gray-700">
-                        <th className="py-3 px-3"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /></th>
-                        <th className="text-left py-3 px-3">Date</th>
-                        <th className="text-left py-3 px-3">User</th>
-                        <th className="text-left py-3 px-3">Amount</th>
-                        <th className="text-left py-3 px-3">Wallet</th>
-                        <th className="text-left py-3 px-3">Status</th>
-                        <th className="text-left py-3 px-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {withdrawals.length === 0 ? (
-                        <tr><td colSpan={7} className="text-gray-400 text-center py-4">No pending withdrawals</td></tr>
-                      ) : (
-                        withdrawals.map((tx) => (
+                {withdrawals.length === 0 ? (
+                  <div className="text-gray-400 text-center py-4">No pending withdrawals</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-900/80">
+                        <tr className="text-gray-400 border-b border-gray-700">
+                          <th className="py-3 px-3"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /></th>
+                          <th className="text-left py-3 px-3">Date</th>
+                          <th className="text-left py-3 px-3">User</th>
+                          <th className="text-left py-3 px-3">Amount</th>
+                          <th className="text-left py-3 px-3">Wallet</th>
+                          <th className="text-left py-3 px-3">Status</th>
+                          <th className="text-left py-3 px-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {withdrawals.map((tx) => (
                           <tr key={tx.id} className="border-b border-gray-800">
                             <td className="py-2 px-3">
                               <input type="checkbox" checked={selectedWithdrawals.includes(tx.id)} onChange={() => toggleSelect(tx.id)} />
@@ -584,11 +575,8 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 text-white">{tx.user?.email || 'Unknown'}</td>
                             <td className="py-2 px-3 text-orange-400">${Number(tx.amount).toFixed(2)}</td>
                             <td className="py-2 px-3 text-white flex items-center gap-2">
-                              <span>{extractWallet(tx.description) || '-'}</span>
-                              <button
-                                className="text-blue-400 hover:text-blue-300 text-xs underline"
-                                onClick={() => openWalletModal(tx.user)}
-                              >Edit Wallet</button>
+                              <span>{tx.wallet || extractWallet(tx.description) || '-'}</span>
+                              <button className="text-blue-400 hover:text-blue-300 text-xs underline" onClick={() => openWalletModal(tx.user)}>Edit Wallet</button>
                             </td>
                             <td className="py-2 px-3">
                               <span className={`px-2 py-1 rounded text-xs ${
@@ -621,11 +609,11 @@ export default function AdminDashboard() {
                               )}
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </Card>
             </div>
           )}
