@@ -101,7 +101,8 @@ export default function AdminDashboard() {
     });
     setActionLoadingId(null);
     await loadData();
-    window.location.reload();
+    console.log('withdrawals:', withdrawals);
+    console.log('transactionsData:', transactions);
   }
   async function handleReject(id) {
     setActionLoadingId(id);
@@ -111,7 +112,8 @@ export default function AdminDashboard() {
     });
     setActionLoadingId(null);
     await loadData();
-    window.location.reload();
+    console.log('withdrawals:', withdrawals);
+    console.log('transactionsData:', transactions);
   }
   async function handleHold(id) {
     // Просто меняем статус на HOLD (если потребуется, реализовать на backend)
@@ -125,7 +127,8 @@ export default function AdminDashboard() {
     });
     setActionLoadingId(null);
     await loadData();
-    window.location.reload();
+    console.log('withdrawals:', withdrawals);
+    console.log('transactionsData:', transactions);
   }
   async function handleBatchApprove() {
     setBatchApproving(true);
@@ -139,7 +142,8 @@ export default function AdminDashboard() {
     setBatchApproving(false);
     setSelectedWithdrawals([]);
     await loadData();
-    window.location.reload();
+    console.log('withdrawals:', withdrawals);
+    console.log('transactionsData:', transactions);
   }
 
   useEffect(() => {
