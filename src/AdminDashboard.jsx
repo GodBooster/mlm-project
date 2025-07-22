@@ -619,11 +619,11 @@ export default function AdminDashboard() {
                                 tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
                                 tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
                                 tx.status === 'CHECK' ? 'bg-orange-900/20 text-orange-400' :
-                                tx.status === 'REJECTED' ? 'bg-red-900/20 text-red-400' :
+                                tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-900/20 text-red-400' :
                                 'bg-gray-700/20 text-gray-400'
                               }`}>
                                 {tx.status === 'CHECK' ? 'Check' :
-                                tx.status === 'REJECTED' ? 'Rejected' :
+                                tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'Rejected' :
                                 tx.status === 'COMPLETED' ? 'Completed' :
                                 tx.status === 'PENDING' ? 'Pending' :
                                 tx.status}
@@ -767,10 +767,10 @@ export default function AdminDashboard() {
                           <span className={`px-2 py-1 rounded text-xs ${
                             tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
                             tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
-                            tx.status === 'REJECTED' ? 'bg-red-900/20 text-red-400' :
+                            tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-900/20 text-red-400' :
                             'bg-gray-700/20 text-gray-400'
                           }`}>
-                            {tx.status === 'REJECTED' ? 'Rejected' : tx.status}
+                            {tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'Rejected' : tx.status}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-gray-300 max-w-[200px] truncate" title={tx.description}>
@@ -1188,10 +1188,10 @@ export default function AdminDashboard() {
                             <span className={`px-2 py-1 rounded text-xs ${
                               tx.status === 'COMPLETED' ? 'bg-green-900/20 text-green-400' :
                               tx.status === 'PENDING' ? 'bg-yellow-900/20 text-yellow-400' :
-                              tx.status === 'REJECTED' ? 'bg-red-900/20 text-red-400' :
+                              tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-900/20 text-red-400' :
                               'bg-gray-700/20 text-gray-400'
                             }`}>
-                              {tx.status === 'REJECTED' ? 'Rejected' : tx.status}
+                              {tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'Rejected' : tx.status}
                             </span>
                           </td>
                         </tr>

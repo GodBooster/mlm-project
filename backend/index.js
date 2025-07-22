@@ -4,7 +4,6 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import multer from 'multer'
 import { PrismaClient, TransactionStatus } from '@prisma/client'
-console.log('Prisma client version:', PrismaClient.prismaVersion)
 import scheduler from './jobs/scheduler.js'
 import investmentService from './services/investment-service.js'
 import referralService from './services/referral-service.js'
