@@ -596,9 +596,19 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td className="py-2 px-3 flex gap-2">
-                              <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>Approve</button>
-                              <button className="bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleCheck(tx.id)} disabled={actionLoadingId === tx.id}>Check</button>
-                              <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>Reject</button>
+                              {tx.status === 'PENDING' && (
+                                <>
+                                  <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Approve'}</button>
+                                  <button className="bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleCheck(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Check'}</button>
+                                  <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Reject'}</button>
+                                </>
+                              )}
+                              {tx.status === 'CHECK' && (
+                                <>
+                                  <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Approve'}</button>
+                                  <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Reject'}</button>
+                                </>
+                              )}
                             </td>
                           </tr>
                         ))
