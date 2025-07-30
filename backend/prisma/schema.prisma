@@ -29,6 +29,7 @@ model User {
   lastLogin                DateTime?
   investments              Investment[]
   transactions             Transaction[]
+  defiPositions            DefiPosition[]
   referrer                 User?         @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
   referrals                User[]        @relation("ReferralRelation")
 }
@@ -91,4 +92,32 @@ enum TransactionStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum PositionStatus {
+  FARMING
+  UNSTAKED
+}
+
+model DefiPosition {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  poolId      String
+  symbol      String
+  project     String
+  chain       String
+  entryApy    Float
+  currentApy  Float
+  entryTvl    Float
+  currentTvl  Float
+  status      PositionStatus
+  entryDate   DateTime
+  exitDate    DateTime?
+  exitReason  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  user        User           @relation(fields: [userId], references: [id])
+  
+  @@map("defi_positions")
 }

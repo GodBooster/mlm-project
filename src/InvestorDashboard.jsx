@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Home, History, Package, Users, LogOut, Eye, EyeOff, Copy, UserPlus, Award, Menu, Camera, Lock } from 'lucide-react';
+import { Home, History, Package, Users, LogOut, Eye, EyeOff, Copy, UserPlus, Award, Menu, Camera, Lock, BarChart3 } from 'lucide-react';
 import LoginPage from './LoginPage';
 import InvestmentPackagesPage from './InvestmentPackagesPage';
 import ReferralSystemPage from './ReferralSystemPage';
 import TeamPage from './TeamPage';
 import RankRewardsPage from './RankRewardsPage';
+import ReportPage from './ReportPage';
 import WithdrawModal from './WithdrawModal';
 
 
@@ -410,9 +411,9 @@ const InvestorDashboard = () => {
         setUserData(profileData);
         fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
           .then(res => res.json()).then(setTransactions);
-        setShowWithdrawModal(false);
-        setModalAmount('');
-        setWalletAddress('');
+    setShowWithdrawModal(false); 
+    setModalAmount(''); 
+    setWalletAddress('');
       } else {
         alert(data.error || 'Withdrawal error');
       }
@@ -565,7 +566,8 @@ const InvestorDashboard = () => {
     { id: 'packages', icon: Package, label: 'Investment Packages' },
     { id: 'referrals', icon: Users, label: 'Referral System' },
     { id: 'team', icon: UserPlus, label: 'Your team' },
-    { id: 'rankrewards', icon: Award, label: 'Rank Rewards' }
+    { id: 'rankrewards', icon: Award, label: 'Rank Rewards' },
+    { id: 'report', icon: BarChart3, label: 'Report' }
   ];
 
   // Logout button - positioned separately at the bottom
@@ -885,10 +887,10 @@ const InvestorDashboard = () => {
                             <th className="py-3 px-4 text-left font-semibold text-white uppercase">Type</th>
                             <th className="py-3 px-4 text-left font-semibold text-white uppercase">Amount</th>
                             <th className="py-3 px-4 text-left font-semibold text-white uppercase">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {transactions.filter(tx => tx.type !== 'Deposit address').map((tx, i) => (
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.filter(tx => tx.type !== 'Deposit address').map((tx, i) => (
                             <tr
                               key={i}
                               className={`transition-all duration-200 ${i % 2 === 0 ? 'bg-white/10 hover:bg-cyan-400/10' : 'bg-white/5 hover:bg-cyan-400/15'}`}
@@ -904,7 +906,7 @@ const InvestorDashboard = () => {
                                     {tx.description.replace('Withdrawal to ', '')}
                                   </div>
                                 )}
-                              </td>
+                          </td>
                               <td className={`py-3 px-4 font-mono font-bold ${tx.type === 'DEPOSIT' ? 'text-green-400' : 'text-orange-400'}`}>${Number(tx.amount).toFixed(2)}</td>
                               <td className="py-3 px-4">
                                 <span
@@ -913,14 +915,14 @@ const InvestorDashboard = () => {
                                       tx.status === 'PENDING' ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/30 animate-pulse' :
                                       tx.status === 'REJECTED' || tx.status === 'FAILED' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : ''}`}
                                 >
-                                  {tx.status === 'PENDING' ? (
+                            {tx.status === 'PENDING' ? (
                                     <>
                                       Pending
                                       <span className="ml-1 loading-dot bg-yellow-400"></span>
                                       <span className="loading-dot bg-yellow-400"></span>
                                       <span className="loading-dot bg-yellow-400"></span>
                                     </>
-                                  ) : tx.status === 'COMPLETED' ? (
+                            ) : tx.status === 'COMPLETED' ? (
                                     'Completed'
                                   ) : tx.status === 'REJECTED' || tx.status === 'FAILED' ? (
                                     'Rejected'
@@ -928,12 +930,12 @@ const InvestorDashboard = () => {
                                     tx.status
                                   )}
                                 </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
                   </div>
                   <style>{`
                     .loading-dot {
@@ -1010,6 +1012,7 @@ const InvestorDashboard = () => {
             {currentPage === 'referrals' && <ReferralSystemPage userData={userData} referralTree={referralTree} referralLink={referralLink} packages={packages} transactions={transactions} sponsor={sponsor} currentRank={currentRank} />}
             {currentPage === 'team' && <TeamPage referralTree={referralTree} userData={userData} tableView={tableView} currentRank={currentRank} />}
             {currentPage === 'rankrewards' && <RankRewardsPage onRankUpdate={handleRankUpdate} userData={userData} />}
+            {currentPage === 'report' && <ReportPage userData={userData} />}
           </div>
         </div>
       </div>

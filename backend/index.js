@@ -23,6 +23,7 @@ const allowedOrigins = [
   'https://margine-space.com',
   'https://transgresse.netlify.app',
   'http://localhost:5173',
+  'http://localhost:5174',
   'http://localhost:3000'
 ];
 
@@ -1748,6 +1749,73 @@ app.put('/api/admin/withdrawals/:id/hold', authenticateToken, requireAdmin, asyn
     res.json({ success: true, transaction: tx });
   } catch (error) {
     console.error('[HOLD ENDPOINT ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DeFi Pool Position endpoints
+app.get('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Проверяем права доступа
+    if (req.user.id !== parseInt(userId) && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const positions = await prisma.defiPosition.findMany({
+      where: { userId: parseInt(userId) },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(positions);
+  } catch (error) {
+    console.error('[DEFI POSITIONS GET ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { positions } = req.body;
+    
+    // Проверяем права доступа
+    if (req.user.id !== parseInt(userId) && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Удаляем старые позиции пользователя
+    await prisma.defiPosition.deleteMany({
+      where: { userId: parseInt(userId) }
+    });
+
+    // Создаем новые позиции
+    const createdPositions = await Promise.all(
+      positions.map(position => 
+        prisma.defiPosition.create({
+          data: {
+            userId: parseInt(userId),
+            poolId: position.poolId,
+            symbol: position.symbol,
+            project: position.project,
+            chain: position.chain,
+            entryApy: position.entryApy,
+            currentApy: position.currentApy,
+            entryTvl: position.entryTvl,
+            currentTvl: position.currentTvl,
+            status: position.status,
+            entryDate: new Date(position.entryDate),
+            exitDate: position.exitDate ? new Date(position.exitDate) : null,
+            exitReason: position.exitReason
+          }
+        })
+      )
+    );
+
+    res.json(createdPositions);
+  } catch (error) {
+    console.error('[DEFI POSITIONS SAVE ERROR]', error);
     res.status(500).json({ error: error.message });
   }
 }); 
