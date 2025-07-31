@@ -1819,3 +1819,39 @@ app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 }); 
+
+// Update only active positions (for data updates without changing history)
+app.put('/api/defi-positions/:userId/update', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { positions } = req.body;
+    
+    // Проверяем права доступа
+    if (req.user.id !== parseInt(userId) && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Update only active positions (farming status)
+    const updatedPositions = await Promise.all(
+      positions.map(position => 
+        prisma.defiPosition.updateMany({
+          where: { 
+            userId: parseInt(userId),
+            poolId: position.poolId,
+            status: PositionStatus.FARMING
+          },
+          data: {
+            currentApy: position.currentApy,
+            currentTvl: position.currentTvl,
+            updatedAt: new Date()
+          }
+        })
+      )
+    );
+
+    res.json({ success: true, updated: updatedPositions.length });
+  } catch (error) {
+    console.error('[DEFI POSITIONS UPDATE ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+}); 

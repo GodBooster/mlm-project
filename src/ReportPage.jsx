@@ -66,6 +66,24 @@ const ReportPage = ({ userData }) => {
     }
   };
 
+  const updateActivePositions = async (positions) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token || !userData?.id) return;
+      
+      await fetch(`${API}/api/defi-positions/${userData.id}/update`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ positions })
+      });
+    } catch (e) {
+      console.error('Error updating positions:', e);
+    }
+  };
+
   const formatNumber = (num) => {
     if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
     if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
@@ -150,57 +168,62 @@ const ReportPage = ({ userData }) => {
       setError(null);
       
       const pools = await fetchPools();
-      const eligiblePools = filterEligiblePools(pools);
       const currentPositions = await loadPositions();
-       
-       let updatedPositions = [...currentPositions];
       
-      // STEP 1: Check current active positions for exit conditions
-      updatedPositions = updatedPositions.map(position => {
-        if (position.status === 'farming') {
-          const updatedPool = pools.find(p => p.pool === position.poolId);
-          
-          if (!updatedPool) {
-            return {
-              ...position,
-              status: 'unstaked',
-              exitDate: new Date().toISOString(),
-              exitReason: 'Pool removed'
-            };
-          }
-          
-          const monthlyAPR = calculateMonthlyAPR(updatedPool.apy);
-          const tvlDrop = (position.entryTvl - updatedPool.tvlUsd) / position.entryTvl;
-          
-          // Update current data
-          position.currentApy = updatedPool.apy;
-          position.currentTvl = updatedPool.tvlUsd;
-          
-          // Check exit conditions
-          if (monthlyAPR < CONFIG.EXIT_MONTHLY_APR || updatedPool.tvlUsd < CONFIG.EXIT_TVL_USD) {
-            return {
-              ...position,
-              status: 'unstaked',
-              exitDate: new Date().toISOString(),
-              exitReason: monthlyAPR < CONFIG.EXIT_MONTHLY_APR 
-                ? `APR dropped to ${monthlyAPR.toFixed(1)}%/month` 
-                : `TVL dropped to ${formatNumber(updatedPool.tvlUsd)}`
-            };
-          }
+      // Separate active and historical positions
+      const activePositions = currentPositions.filter(p => p.status === 'farming');
+      const historicalPositions = currentPositions.filter(p => p.status === 'unstaked');
+      
+      let updatedActivePositions = [...activePositions];
+      let positionsToClose = [];
+      
+      // STEP 1: Update active positions data and check exit conditions
+      updatedActivePositions = updatedActivePositions.map(position => {
+        const updatedPool = pools.find(p => p.pool === position.poolId);
+        
+        if (!updatedPool) {
+          // Position should be closed
+          const closedPosition = {
+            ...position,
+            status: 'unstaked',
+            exitDate: new Date().toISOString(),
+            exitReason: 'Pool removed'
+          };
+          positionsToClose.push(closedPosition);
+          return null; // Will be filtered out
         }
+        
+        // Update current data
+        position.currentApy = updatedPool.apy;
+        position.currentTvl = updatedPool.tvlUsd;
+        
+        const monthlyAPR = calculateMonthlyAPR(updatedPool.apy);
+        
+        // Check exit conditions
+        if (monthlyAPR < CONFIG.EXIT_MONTHLY_APR || updatedPool.tvlUsd < CONFIG.EXIT_TVL_USD) {
+          const closedPosition = {
+            ...position,
+            status: 'unstaked',
+            exitDate: new Date().toISOString(),
+            exitReason: monthlyAPR < CONFIG.EXIT_MONTHLY_APR 
+              ? `APR dropped to ${monthlyAPR.toFixed(1)}%/month` 
+              : `TVL dropped to ${formatNumber(updatedPool.tvlUsd)}`
+          };
+          positionsToClose.push(closedPosition);
+          return null; // Will be filtered out
+        }
+        
         return position;
-      });
+      }).filter(Boolean); // Remove null positions
       
-      // STEP 2: Add new positions until maximum (5 active pools) is reached
-      const activePositionsAfterUpdate = updatedPositions.filter(p => p.status === 'farming');
-      const needNewPositions = CONFIG.MAX_ACTIVE_POSITIONS - activePositionsAfterUpdate.length;
+      // STEP 2: Add new positions if needed
+      const needNewPositions = CONFIG.MAX_ACTIVE_POSITIONS - updatedActivePositions.length;
       
-      if (needNewPositions > 0 && eligiblePools.length > 0) {
-        // Get active pool IDs (don't exclude closed pools for reuse)
-        const currentActivePoolIds = activePositionsAfterUpdate.map(p => p.poolId);
+      if (needNewPositions > 0) {
+        const eligiblePools = filterEligiblePools(pools);
+        const currentActivePoolIds = updatedActivePositions.map(p => p.poolId);
         const newPools = selectBestPools(eligiblePools, currentActivePoolIds, needNewPositions);
         
-        // Add new positions
         console.log(`Adding ${newPools.length} new pools from ${eligiblePools.length} available`);
         newPools.forEach(pool => {
           const newPosition = {
@@ -218,13 +241,27 @@ const ReportPage = ({ userData }) => {
             exitReason: null
           };
           
-          updatedPositions.unshift(newPosition);
+          updatedActivePositions.push(newPosition);
         });
       }
       
-                   console.log('Updated positions:', updatedPositions);
-      setPositions(updatedPositions);
-      await savePositions(updatedPositions);
+      // Combine all positions: active + historical + newly closed
+      const allPositions = [
+        ...updatedActivePositions,
+        ...historicalPositions,
+        ...positionsToClose
+      ];
+      
+      console.log('Updated positions:', allPositions);
+      setPositions(allPositions);
+      
+      // Save only if there are new positions to add or positions to close
+      if (positionsToClose.length > 0 || needNewPositions > 0) {
+        await savePositions(allPositions);
+      } else {
+        // Only update active positions data
+        await updateActivePositions(updatedActivePositions);
+      }
       
     } catch (error) {
       setError('Failed to get pool data');
