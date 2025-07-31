@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "canvas": "^3.1.2",
     "dotenv": "^16.6.1",
     "lucide-react": "^0.525.0",
     "react": "^19.1.0",
