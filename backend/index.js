@@ -3,7 +3,7 @@ import 'dotenv/config';
 import express from 'express'
 import bcrypt from 'bcrypt'
 import multer from 'multer'
-import { PrismaClient, TransactionStatus } from '@prisma/client'
+import { PrismaClient, TransactionStatus, PositionStatus } from '@prisma/client'
 import scheduler from './jobs/scheduler.js'
 import investmentService from './services/investment-service.js'
 import referralService from './services/referral-service.js'
@@ -1804,7 +1804,7 @@ app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
             currentApy: position.currentApy,
             entryTvl: position.entryTvl,
             currentTvl: position.currentTvl,
-            status: position.status,
+            status: position.status === 'farming' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
             entryDate: new Date(position.entryDate),
             exitDate: position.exitDate ? new Date(position.exitDate) : null,
             exitReason: position.exitReason
