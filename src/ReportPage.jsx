@@ -73,7 +73,7 @@ const ReportPage = ({ userData }) => {
   };
 
   const calculateMonthlyAPR = (yearlyAPR) => {
-    return yearlyAPR / 12; // Простое деление APY на 12
+    return yearlyAPR / 12; // Simple division of APY by 12
   };
 
   const getChainClass = (chain) => {
@@ -92,12 +92,12 @@ const ReportPage = ({ userData }) => {
   const fetchPools = async () => {
     try {
       const response = await fetch(CONFIG.API_URL);
-      if (!response.ok) throw new Error('API недоступен');
+      if (!response.ok) throw new Error('API unavailable');
       
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      console.error('Ошибка получения данных:', error);
+      console.error('Error fetching data:', error);
       throw error;
     }
   };
@@ -164,26 +164,26 @@ const ReportPage = ({ userData }) => {
               ...position,
               status: 'unstaked',
               exitDate: new Date().toISOString(),
-              exitReason: 'Пул удален'
+              exitReason: 'Pool removed'
             };
           }
           
           const monthlyAPR = calculateMonthlyAPR(updatedPool.apy);
           const tvlDrop = (position.entryTvl - updatedPool.tvlUsd) / position.entryTvl;
           
-          // Обновляем текущие данные
+          // Update current data
           position.currentApy = updatedPool.apy;
           position.currentTvl = updatedPool.tvlUsd;
           
-          // Проверяем условия выхода
+          // Check exit conditions
           if (monthlyAPR < CONFIG.EXIT_MONTHLY_APR || updatedPool.tvlUsd < CONFIG.EXIT_TVL_USD) {
             return {
               ...position,
               status: 'unstaked',
               exitDate: new Date().toISOString(),
               exitReason: monthlyAPR < CONFIG.EXIT_MONTHLY_APR 
-                ? `APR упал до ${monthlyAPR.toFixed(1)}%/мес` 
-                : `TVL упал до ${formatNumber(updatedPool.tvlUsd)}`
+                ? `APR dropped to ${monthlyAPR.toFixed(1)}%/month` 
+                : `TVL dropped to ${formatNumber(updatedPool.tvlUsd)}`
             };
           }
         }
@@ -366,8 +366,8 @@ const ReportPage = ({ userData }) => {
                    {activePositions.length === 0 ? (
                      <tr>
                        <td colSpan="6" className="py-12 text-center">
-                         <div className="text-gray-400 text-lg mb-2">Нет активных пулов</div>
-                         <div className="text-gray-500 text-sm">Поиск подходящих пулов...</div>
+                         <div className="text-gray-400 text-lg mb-2">No active pools</div>
+                         <div className="text-gray-500 text-sm">Searching for suitable pools...</div>
                        </td>
                      </tr>
                    ) : (
@@ -393,7 +393,7 @@ const ReportPage = ({ userData }) => {
                              {position.currentApy.toFixed(1)}%
                            </div>
                            <div className="text-gray-500 text-sm">
-                             {monthlyAPR.toFixed(1)}%/мес
+                             {monthlyAPR.toFixed(1)}%/month
                            </div>
                          </td>
                          <td className="py-4 px-4">
@@ -484,7 +484,7 @@ const ReportPage = ({ userData }) => {
                              {position.entryApy.toFixed(1)}%
                            </div>
                            <div className="text-gray-500 text-sm">
-                             {entryMonthlyAPR.toFixed(1)}%/мес
+                             {entryMonthlyAPR.toFixed(1)}%/month
                            </div>
                          </td>
                          <td className="py-4 px-4">
