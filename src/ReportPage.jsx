@@ -36,6 +36,7 @@ const ReportPage = ({ userData }) => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Loaded positions:', data);
         return data.map(pos => ({
           ...pos,
           status: pos.status.toLowerCase() === 'farming' ? 'farming' : 'unstaked'
@@ -221,8 +222,9 @@ const ReportPage = ({ userData }) => {
         });
       }
       
-             setPositions(updatedPositions);
-       await savePositions(updatedPositions);
+                   console.log('Updated positions:', updatedPositions);
+      setPositions(updatedPositions);
+      await savePositions(updatedPositions);
       
     } catch (error) {
       setError('Failed to get pool data');
@@ -253,6 +255,12 @@ const ReportPage = ({ userData }) => {
   const activeCount = activePositions.length;
   const totalCount = positions.length;
   
+  // Debug information
+  console.log('Total positions:', totalCount);
+  console.log('Active positions:', activeCount);
+  console.log('Closed positions:', closedPositions.length);
+  console.log('All positions:', positions);
+  
   // Calculate average monthly yield for active pools
   const averageMonthlyAPR = activePositions.length > 0 
     ? activePositions.reduce((sum, pos) => sum + calculateMonthlyAPR(pos.currentApy), 0) / activePositions.length
@@ -274,6 +282,13 @@ const ReportPage = ({ userData }) => {
            <p className="text-gray-400">Monitoring profitable DeFi pools</p>
          </div>
           
+          <button 
+            onClick={updatePools}
+            disabled={loading}
+            className="glass-button px-4 py-2 rounded-lg text-sm"
+          >
+            {loading ? 'Updating...' : 'Update Pools'}
+          </button>
         </div>
 
         {/* Stats Cards */}
