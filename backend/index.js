@@ -1804,7 +1804,7 @@ app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
             currentApy: position.currentApy,
             entryTvl: position.entryTvl,
             currentTvl: position.currentTvl,
-            status: position.status === 'farming' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
+            status: position.status === 'farming' || position.status === 'FARMING' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
             entryDate: new Date(position.entryDate),
             exitDate: position.exitDate ? new Date(position.exitDate) : null,
             exitReason: position.exitReason
