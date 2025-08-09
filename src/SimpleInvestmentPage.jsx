@@ -212,10 +212,10 @@ const SimpleInvestmentPage = ({ userData, packages, onInvest, loading }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    const minAmount = selectedPackage.minAmount || 0;
+                    const minAmount = selectedPackage.minAmount || 1;
                     const maxAmount = Math.min(selectedPackage.maxAmount || 0, userData?.balance || 0);
                     const range = maxAmount - minAmount;
-                    const amount = minAmount + Math.floor(range * 0.25);
+                    const amount = Math.round(minAmount + (range * 0.25));
                     setInvestAmount(amount.toString());
                   }}
                   className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
@@ -226,10 +226,10 @@ const SimpleInvestmentPage = ({ userData, packages, onInvest, loading }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    const minAmount = selectedPackage.minAmount || 0;
+                    const minAmount = selectedPackage.minAmount || 1;
                     const maxAmount = Math.min(selectedPackage.maxAmount || 0, userData?.balance || 0);
                     const range = maxAmount - minAmount;
-                    const amount = minAmount + Math.floor(range * 0.5);
+                    const amount = Math.round(minAmount + (range * 0.5));
                     setInvestAmount(amount.toString());
                   }}
                   className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
