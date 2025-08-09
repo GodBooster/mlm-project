@@ -728,17 +728,19 @@ export default function AdminDashboard() {
           {currentPage === 'transactions' && (
             <Card>
               <div className="mb-6">
-                <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-2xl font-bold text-white">Transactions</h3>
-                  <p className="text-gray-300 opacity-70 text-sm">View and manage all system transactions</p>
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Transactions</h3>
+                    <p className="text-gray-300 opacity-70 text-sm">View and manage all system transactions</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowAddTransactionModal(true)}
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                  >
+                    <Plus size={18} />
+                    Add Transaction
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setShowAddTransactionModal(true)}
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-                >
-                  <Plus size={18} />
-                  Add Transaction
-                </button>
                 <div className="flex gap-2">
                   <select
                     value={filterStatus}
@@ -808,17 +810,19 @@ export default function AdminDashboard() {
           {currentPage === 'packages' && (
             <Card>
               <div className="mb-6">
-                <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-2xl font-bold text-white">Investment Packages</h3>
-                  <p className="text-gray-300 opacity-70 text-sm">Manage investment packages and their settings</p>
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Investment Packages</h3>
+                    <p className="text-gray-300 opacity-70 text-sm">Manage investment packages and their settings</p>
+                  </div>
+                  <button 
+                    onClick={handleAddPackage}
+                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                  >
+                    <Plus size={18} />
+                    Add Package
+                  </button>
                 </div>
-                <button 
-                  onClick={handleAddPackage}
-                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-                >
-                  <Plus size={18} />
-                  Add Package
-                </button>
               </div>
               <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
