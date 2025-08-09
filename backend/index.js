@@ -751,6 +751,66 @@ app.post('/api/wallet', authenticateToken, async (req, res) => {
   }
 })
 
+// Generate deposit address using merchant API
+app.post('/api/deposit/generate-address', authenticateToken, async (req, res) => {
+  try {
+    const { network = 'BSC' } = req.body
+    const userId = req.user.id
+    
+    // Generate unique order_id for this user
+    const orderId = `USER_${userId}_${Date.now()}`
+    
+    console.log(`[DEPOSIT] Generating address for user ${userId}, network: ${network}, order_id: ${orderId}`)
+    
+    // Call merchant API
+    const merchantResponse = await fetch('https://telegabot.cyberflow.space/api/cabina_transfer-address', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer @!HG~9Ln#6re777GVDF+daf*9Y7e9(;y'
+      },
+      body: JSON.stringify({
+        order_id: orderId,
+        network: network
+      })
+    })
+    
+    const merchantData = await merchantResponse.json()
+    
+    if (!merchantResponse.ok) {
+      console.error('[DEPOSIT] Merchant API error:', merchantData)
+      return res.status(400).json({ error: merchantData.message || 'Failed to generate deposit address' })
+    }
+    
+    // Extract address from merchant response
+    const depositAddress = merchantData.address || merchantData.wallet_address || merchantData.result?.address
+    
+    if (!depositAddress) {
+      console.error('[DEPOSIT] No address in merchant response:', merchantData)
+      return res.status(400).json({ error: 'No deposit address received from merchant' })
+    }
+    
+    // Save address to user record
+    await prisma.user.update({
+      where: { id: userId },
+      data: { depositAddress }
+    })
+    
+    console.log(`[DEPOSIT] Address generated successfully for user ${userId}: ${depositAddress}`)
+    
+    res.json({
+      success: true,
+      depositAddress,
+      network,
+      orderId
+    })
+    
+  } catch (error) {
+    console.error('[DEPOSIT] Error generating address:', error)
+    res.status(500).json({ error: 'Failed to generate deposit address' })
+  }
+})
+
 app.post('/api/deposit', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body

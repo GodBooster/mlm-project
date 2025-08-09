@@ -505,12 +505,50 @@ const InvestorDashboard = () => {
     }
   }, [modalAmount, walletAddress, token]);
 
+  // Добавляем стейты для депозита
+  const [depositAddress, setDepositAddress] = useState('');
+  const [selectedNetwork, setSelectedNetwork] = useState('BSC');
+  const [isGeneratingAddress, setIsGeneratingAddress] = useState(false);
+
+  const closeModal = useCallback(() => {
+    setShowDepositModal(false);
+    setShowWithdrawModal(false);
+    setModalAmount('');
+    setWalletAddress('');
+    setDepositAddress('');
+  }, []);
+
+  const generateDepositAddress = useCallback(async () => {
+    setIsGeneratingAddress(true);
+    try {
+      const res = await fetch(`${API}/api/deposit/generate-address`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ network: selectedNetwork })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDepositAddress(data.depositAddress);
+        showSuccess(`Deposit address generated for ${selectedNetwork} network`);
+      } else {
+        showError(data.error || 'Failed to generate deposit address');
+      }
+    } catch (error) {
+      showError('Network error. Please try again.');
+    } finally {
+      setIsGeneratingAddress(false);
+    }
+  }, [selectedNetwork, token, showSuccess, showError]);
+
   const handleModalDeposit = useCallback(async () => {
-    if (!depositAmount || isNaN(depositAmount) || Number(depositAmount) <= 0) {
+    if (!modalAmount || isNaN(modalAmount) || Number(modalAmount) <= 0) {
       showError('Enter a valid deposit amount!');
       return;
     }
-    setDepositLoading(true);
+    setModalLoading(true);
     try {
       const res = await fetch(`${API}/api/deposit`, {
         method: 'POST',
@@ -518,22 +556,21 @@ const InvestorDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: Number(depositAmount) })
+        body: JSON.stringify({ amount: Number(modalAmount) })
       });
       const data = await res.json();
       if (res.ok) {
         setUserData(u => ({ ...u, balance: data.balance }));
         fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
           .then(res => res.json()).then(setTransactions);
-        setDepositOpen(false);
-        setDepositAmount('');
+        closeModal();
       } else {
         showError(data.error || 'Deposit error');
       }
     } finally {
-      setDepositLoading(false);
+      setModalLoading(false);
     }
-  }, [depositAmount, token]);
+  }, [modalAmount, token, showError, closeModal]);
 
   // Image compression utility
   const compressImage = useCallback((file, maxWidth = 100, maxHeight = 100, quality = 0.6) => {
@@ -1250,12 +1287,66 @@ const InvestorDashboard = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select deposit amount</label>
-                        <input type="number" value={modalAmount} onChange={e => setModalAmount(e.target.value)} className="w-full glass-input px-4 py-3 text-white focus:outline-none" placeholder="Enter amount" />
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                        <p className="text-blue-400 text-sm">Generate a unique deposit address for secure cryptocurrency transfers</p>
                       </div>
-                      <button onClick={handleModalDeposit} className="w-full orange-button text-white py-3 rounded-lg" disabled={modalLoading}>{modalLoading ? 'Processing...' : 'Deposit'}</button>
-                      <button onClick={closeModal} className="w-full glass-button text-white py-2 rounded-lg">Cancel</button>
+                      
+                      <div>
+                        <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select Network</label>
+                        <select 
+                          value={selectedNetwork} 
+                          onChange={e => setSelectedNetwork(e.target.value)}
+                          className="w-full glass-input px-4 py-3 text-white focus:outline-none"
+                        >
+                          <option value="BSC">BSC (Binance Smart Chain)</option>
+                          <option value="TRX">TRX (Tron Network)</option>
+                        </select>
+                      </div>
+
+                      {!depositAddress ? (
+                        <button 
+                          onClick={generateDepositAddress} 
+                          className="w-full orange-button text-white py-3 rounded-lg" 
+                          disabled={isGeneratingAddress}
+                        >
+                          {isGeneratingAddress ? 'Generating Address...' : 'Generate Deposit Address'}
+                        </button>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[rgb(249,115,22)] text-sm mb-2">Your Deposit Address ({selectedNetwork})</label>
+                            <div className="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
+                              <span className="text-white font-mono text-sm break-all">{depositAddress}</span>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(depositAddress);
+                                  showSuccess('Address copied to clipboard!');
+                                }}
+                                className="ml-2 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                            <p className="text-green-400 text-sm">
+                              <strong>Important:</strong> Send only {selectedNetwork} compatible tokens to this address. 
+                              Funds will be automatically credited to your account after network confirmation.
+                            </p>
+                          </div>
+
+                          <button 
+                            onClick={generateDepositAddress} 
+                            className="w-full glass-button text-white py-2 rounded-lg"
+                            disabled={isGeneratingAddress}
+                          >
+                            {isGeneratingAddress ? 'Generating...' : 'Generate New Address'}
+                          </button>
+                        </div>
+                      )}
+
+                      <button onClick={closeModal} className="w-full glass-button text-white py-2 rounded-lg">Close</button>
                     </div>
                   )}
                 </div>

@@ -20,6 +20,7 @@ model User {
   updatedAt                DateTime       @updatedAt
   username                 String         @unique
   wallet                   String?
+  depositAddress           String?
   isAdmin                  Boolean        @default(false)
   avatar                   String?
   emailVerificationExpires DateTime?
