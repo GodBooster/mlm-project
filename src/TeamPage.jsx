@@ -86,16 +86,19 @@ export default function TeamPage({ referralTree, userData, tableView, currentRan
       </div>
       {teamTab === 'structure' && (
         <Card>
-          <h4 className="text-xl font-semibold text-white mb-4">Bonus structure</h4>
+          <div className="mb-4">
+            <h4 className="text-2xl font-bold text-white mb-1">Bonus structure</h4>
+            <p className="text-gray-300 opacity-70 text-sm">View your referral bonus levels, conditions, and payout status.</p>
+          </div>
           <div className="overflow-x-auto max-h-[460px] sm:max-h-[calc(100vh-300px)] overflow-y-auto">
             <table className="w-full text-xs sm:text-sm min-w-[200px]">
-              <thead className="sticky top-0 bg-gray-900/80">
-                <tr className="text-gray-400 border-b border-gray-700">
-                  <th className="text-left py-3 px-3 min-w-[40px] whitespace-normal break-words">Level</th>
-                  <th className="text-left py-3 px-3 min-w-[60px] whitespace-normal break-words">Percent</th>
-                  <th className="text-left py-3 px-3 min-w-[80px] whitespace-normal break-words">Bonus sum</th>
-                  <th className="text-left py-3 px-3 min-w-[60px] whitespace-normal break-words">Status</th>
-                  <th className="text-left py-3 px-3 min-w-[100px] whitespace-normal break-words">Condition</th>
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+                <tr>
+                  <th className="text-center py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Lvl</th>
+                  <th className="text-center py-3 px-3 font-semibold text-white uppercase">Reward</th>
+                  <th className="text-center py-3 px-3 font-semibold text-white uppercase">Bonus</th>
+                  <th className="text-center py-3 px-3 font-semibold text-white uppercase">State</th>
+                  <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">To Unlock</th>
                 </tr>
               </thead>
               <tbody>
@@ -103,10 +106,10 @@ export default function TeamPage({ referralTree, userData, tableView, currentRan
                   const unlocked = i === 0 || activeDirects >= lvl.requiredDirects;
                   return (
                     <tr key={lvl.level} className="border-b border-gray-800">
-                      <td className="py-2 px-1 text-white min-w-[40px] whitespace-normal break-words">{lvl.level}</td>
-                      <td className="py-2 px-1 text-orange-400 min-w-[60px] whitespace-normal break-words">{lvl.percent}%</td>
-                      <td className="py-2 px-1 text-white min-w-[80px] whitespace-normal break-words">${commissions[lvl.level]?.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
-                      <td className={`py-2 px-1 min-w-[60px] whitespace-normal break-words ${unlocked ? 'text-green-400' : 'text-red-400'}`}>{unlocked ? 'Open' : 'Closed'}</td>
+                      <td className="py-2 px-1 text-white min-w-[40px] whitespace-normal break-words text-center">{lvl.level}</td>
+                      <td className="py-2 px-1 text-orange-400 min-w-[60px] whitespace-normal break-words text-center">{lvl.percent}%</td>
+                      <td className="py-2 px-1 text-white min-w-[80px] whitespace-normal break-words text-center">${commissions[lvl.level]?.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
+                      <td className={`py-2 px-1 min-w-[60px] whitespace-normal break-words text-center ${unlocked ? 'text-green-400' : 'text-red-400'}`}>{unlocked ? 'Open' : 'Closed'}</td>
                       <td className="py-2 px-1 text-gray-300 min-w-[100px] whitespace-normal break-words">{lvl.requiredDirects === 0 ? 'Always available' : `Need active referrals in 1st line: ${lvl.requiredDirects}`}</td>
                     </tr>
                   );
@@ -122,16 +125,19 @@ export default function TeamPage({ referralTree, userData, tableView, currentRan
       )}
       {teamTab === 'table' && (
         <Card>
-          <h4 className="text-xl font-semibold text-white mb-4">Team Table</h4>
+          <div className="mb-4">
+            <h4 className="text-2xl font-bold text-white mb-1">Team Table</h4>
+            <p className="text-gray-300 opacity-70 text-sm">View your team members and their details</p>
+          </div>
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email" className="mb-4 w-full glass-input px-4 py-2 text-white focus:outline-none text-xs sm:text-sm" />
           <div className="overflow-x-auto max-h-[460px] sm:max-h-[calc(100vh-300px)] overflow-y-auto">
             <table className="w-full text-xs sm:text-sm min-w-[200px]">
-              <thead className="sticky top-0 bg-gray-900/80">
-                <tr className="text-gray-400 border-b border-gray-700">
-                  <th className="text-left py-3 px-3 min-w-[80px] whitespace-normal break-words">Username</th>
-                  <th className="text-left py-3 px-3 min-w-[100px] whitespace-normal break-words">e-mail</th>
-                  <th className="text-left py-3 px-3 min-w-[40px] whitespace-normal break-words">level</th>
-                  <th className="text-left py-3 px-3 min-w-[60px] whitespace-normal break-words">Date</th>
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+                <tr>
+                  <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Username</th>
+                  <th className="text-left py-3 px-3 font-semibold text-white uppercase">e-mail</th>
+                  <th className="text-center py-3 px-3 font-semibold text-white uppercase">Lvl</th>
+                  <th className="text-center py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,8 +145,8 @@ export default function TeamPage({ referralTree, userData, tableView, currentRan
                   <tr key={i} className="border-b border-gray-800">
                     <td className="py-2 px-1 text-white min-w-[80px] whitespace-normal break-words">{r.firstName ? r.firstName + (r.lastName ? ' ' + r.lastName : '') : r.name}</td>
                     <td className="py-2 px-1 text-white min-w-[100px] whitespace-normal break-words">{r.email}</td>
-                    <td className="py-2 px-1 text-orange-400 min-w-[40px] whitespace-normal break-words">{r.level}</td>
-                    <td className="py-2 px-1 text-gray-300 min-w-[60px] whitespace-normal break-words">
+                    <td className="py-2 px-1 text-orange-400 min-w-[40px] whitespace-normal break-words text-center">{r.level}</td>
+                    <td className="py-2 px-1 text-gray-300 min-w-[60px] whitespace-normal break-words text-center">
                       {r.date ? new Date(r.date).toLocaleDateString() : ''}
                     </td>
                   </tr>

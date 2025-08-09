@@ -1,13 +1,43 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  log: ['error'],
+  errorFormat: 'pretty',
+})
 
 class InvestmentService {
+  
+  // Выполнить операцию с retry при обрыве соединения
+  async executeWithRetry(operation, retries = 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.log('[InvestmentService] Error:', error.code, error.message?.substring(0, 100));
+      if ((error.code === 'P1017' || error.code === 'P2028') && retries > 0) {
+        console.log('[InvestmentService] Retrying operation...');
+        await prisma.$disconnect();
+        await prisma.$connect();
+        return await this.executeWithRetry(operation, retries - 1);
+      }
+      throw error;
+    }
+  }
+
   // Create new investment
   async createInvestment(userId, packageId, amount) {
-    const packageData = await prisma.investmentPackage.findUnique({
-      where: { id: packageId }
-    })
+    // Optimized investment creation
+    
+    // Параллельные запросы пользователя и пакета для скорости
+    const [packageData, user] = await Promise.all([
+      prisma.investmentPackage.findUnique({
+        where: { id: packageId },
+        select: { id: true, name: true, minAmount: true, maxAmount: true, duration: true } // добавляем maxAmount
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, balance: true } // только нужные поля
+      })
+    ]);
 
     if (!packageData) {
       throw new Error('Investment package not found')
@@ -17,10 +47,9 @@ class InvestmentService {
       throw new Error(`Amount must be at least ${packageData.minAmount}`)
     }
 
-    // Check user balance
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    })
+    if (packageData.maxAmount && amount > packageData.maxAmount) {
+      throw new Error(`Amount cannot exceed ${packageData.maxAmount}`)
+    }
 
     if (!user) {
       throw new Error('User not found')
@@ -30,16 +59,15 @@ class InvestmentService {
       throw new Error('Insufficient balance')
     }
 
-    // Check if user already has an active investment in this package
+    // Быстрая проверка существующих инвестиций - только ID
     const existingInvestment = await prisma.investment.findFirst({
       where: {
         userId,
         packageId,
         isActive: true,
-        endDate: {
-          gte: new Date()
-        }
-      }
+        endDate: { gte: new Date() }
+      },
+      select: { id: true } // только ID для скорости
     })
 
     // Calculate end date
@@ -47,66 +75,59 @@ class InvestmentService {
     endDate.setDate(endDate.getDate() + packageData.duration)
 
     // Create or update investment and update balance in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      let investment;
+    const result = await this.executeWithRetry(async () => {
+      return await prisma.$transaction(async (tx) => {
+        let investment;
 
-      if (existingInvestment) {
-        // Update existing investment - только добавляем сумму, срок не продлеваем
-        investment = await tx.investment.update({
-          where: { id: existingInvestment.id },
-          data: {
-            amount: {
-              increment: amount
-            }
-            // endDate остается тем же - не продлеваем срок
-          },
-          include: {
-            package: true,
-            user: true
-          }
+        if (existingInvestment) {
+          // Update existing investment - только добавляем сумму, срок не продлеваем
+          investment = await tx.investment.update({
+            where: { id: existingInvestment.id },
+            data: {
+              amount: { increment: amount }
+              // endDate остается тем же - не продлеваем срок
+            },
+            select: { id: true, amount: true, startDate: true, endDate: true } // минимум данных
+          })
+        } else {
+          // Create new investment
+          investment = await tx.investment.create({
+            data: {
+              userId,
+              packageId,
+              amount,
+              endDate,
+              isActive: true
+            },
+            select: { id: true, amount: true, startDate: true, endDate: true, isActive: true, totalEarned: true, lastProfitDate: true, createdAt: true } // минимум данных
+          })
+        }
+
+        // Update user balance - только balance
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { balance: { decrement: amount } },
+          select: { id: true, balance: true } // только нужные поля
         })
-      } else {
-        // Create new investment
-        investment = await tx.investment.create({
+
+        // Create transaction record - без select для скорости
+        await tx.transaction.create({
           data: {
             userId,
-            packageId,
-            amount,
-            endDate,
-            isActive: true
-          },
-          include: {
-            package: true,
-            user: true
+            investmentId: investment.id,
+            type: 'INVESTMENT',
+            amount: amount,
+            description: existingInvestment ? 
+              `Additional investment in ${packageData.name} package` : 
+              `Investment in ${packageData.name} package`,
+            status: 'COMPLETED'
           }
         })
-      }
 
-      // Update user balance
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: {
-          balance: {
-            decrement: amount
-          }
-        }
-      })
-
-      // Create transaction record
-      await tx.transaction.create({
-        data: {
-          userId,
-          investmentId: investment.id,
-          type: 'INVESTMENT',
-          amount: amount,
-          description: existingInvestment ? 
-            `Additional investment in ${packageData.name} package` : 
-            `Investment in ${packageData.name} package`,
-          status: 'COMPLETED'
-        }
-      })
-
-      return { investment, updatedUser }
+              return { investment, updatedUser }
+    }, {
+      timeout: 5000, // Быстрый таймаут - 5 секунд
+    });
     })
 
     return result.investment

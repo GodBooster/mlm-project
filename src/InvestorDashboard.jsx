@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Home, History, Package, Users, LogOut, Eye, EyeOff, Copy, UserPlus, Award, Menu, Camera, Lock, BarChart3 } from 'lucide-react';
+import { Home, History, Package, Users, LogOut, Eye, EyeOff, Copy, UserPlus, Award, Menu, Camera, Lock, BarChart3, X, ArrowRight, ChevronDown } from 'lucide-react';
 import LoginPage from './LoginPage';
-import InvestmentPackagesPage from './InvestmentPackagesPage';
+import SimpleInvestmentPage from './SimpleInvestmentPage';
 import ReferralSystemPage from './ReferralSystemPage';
 import TeamPage from './TeamPage';
 import RankRewardsPage from './RankRewardsPage';
 import ReportPage from './ReportPage';
 import WithdrawModal from './WithdrawModal';
+import ToastContainer from './components/ToastContainer';
+import { useToast } from './hooks/useToast';
 
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const InvestorDashboard = () => {
+  // --- Toast hook ---
+  const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
+  
   // --- Hooks (only at the beginning) ---
   // Восстанавливаем currentPage из localStorage, если есть
   const getInitialPage = () => {
@@ -52,6 +57,8 @@ const InvestorDashboard = () => {
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositLoading, setDepositLoading] = useState(false);
+  const [userAvatar, setUserAvatar] = useState(null); // Отдельное состояние для аватара
+  const [sponsorAvatar, setSponsorAvatar] = useState(null); // Состояние для аватара спонсора
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
@@ -176,7 +183,7 @@ const InvestorDashboard = () => {
       if (res.ok) {
         setToken(data.token);
         localStorage.setItem('token', data.token);
-        setUserData(data.user);
+        // НЕ устанавливаем userData здесь, пусть loadData загрузит полные данные
         setCurrentPage('dashboard');
         localStorage.setItem('currentPage', 'dashboard');
       } else {
@@ -221,6 +228,9 @@ const InvestorDashboard = () => {
     setToken('');
     localStorage.removeItem('token');
     setUserData(null);
+    setTransactions([]);
+    setUserAvatar(null); // Сбрасываем аватар при логауте
+    setSponsorAvatar(null); // Сбрасываем аватар спонсора при логауте
     setCurrentPage('login');
     localStorage.removeItem('currentPage');
   }, []);
@@ -228,6 +238,7 @@ const InvestorDashboard = () => {
   // --- LOAD DATA ---
   const loadData = async () => {
     try {
+      // Загружаем все данные напрямую с сервера - просто и надежно
       const [profileRes, transactionsRes, packagesRes, referralLinkRes, statsRes] = await Promise.all([
         fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -238,7 +249,6 @@ const InvestorDashboard = () => {
 
       // Check if any response is not ok
       if (!profileRes.ok || !transactionsRes.ok || !packagesRes.ok || !referralLinkRes.ok || !statsRes.ok) {
-        // If any request failed, clear token and redirect to login
         console.log('One or more API requests failed, redirecting to login');
         setToken('');
         localStorage.removeItem('token');
@@ -297,6 +307,7 @@ const InvestorDashboard = () => {
         rankData
       });
       
+      // Устанавливаем все данные сразу - как было изначально
       setUserData(profileData);
       setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
       setPackages(Array.isArray(packagesData) ? packagesData : []);
@@ -305,7 +316,9 @@ const InvestorDashboard = () => {
       setSponsor(statsData.sponsor || null);
       setTableView(statsData.tableView || []);
       setCurrentRank(rankData.currentRank?.level ?? 1);
-      setRankData(rankData); // Set rankData for progress bar
+      setRankData(rankData);
+      
+      // Не останавливаем здесь - это делается в finally
     } catch (error) {
       console.error('Error loading data:', error);
       // On any error, redirect to login
@@ -314,6 +327,50 @@ const InvestorDashboard = () => {
       setCurrentPage('login');
     }
   };
+
+  // Load avatar separately when needed
+  const loadUserAvatar = useCallback(async () => {
+    if (!token) return; // Нет токена
+    
+    try {
+      const res = await fetch(`${API}/api/profile/avatar`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUserAvatar(data.avatar || '');
+        console.log('Avatar loaded:', data.avatar ? 'Success' : 'No avatar');
+      } else {
+        console.log('Avatar API error:', data.error);
+        setUserAvatar(''); // Пустая строка означает отсутствие аватара
+      }
+    } catch (error) {
+      console.error('Error loading avatar:', error);
+      setUserAvatar(''); // Пустая строка означает отсутствие аватара
+    }
+  }, [token]);
+
+  // Load sponsor avatar separately when needed
+  const loadSponsorAvatar = useCallback(async (sponsorId) => {
+    if (!token || !sponsorId) return;
+    
+    try {
+      const res = await fetch(`${API}/api/user/${sponsorId}/avatar`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSponsorAvatar(data.avatar || '');
+        console.log('Sponsor avatar loaded:', data.avatar ? 'Success' : 'No avatar');
+      } else {
+        console.log('Sponsor avatar API error:', data.error);
+        setSponsorAvatar('');
+      }
+    } catch (error) {
+      console.error('Error loading sponsor avatar:', error);
+      setSponsorAvatar('');
+    }
+  }, [token]);
 
   useEffect(() => {
     let timeoutId;
@@ -337,6 +394,32 @@ const InvestorDashboard = () => {
     }
     return () => clearTimeout(timeoutId);
   }, [token]);
+
+  // Автоматическая загрузка аватара через 30 секунд после входа в кабинет
+  useEffect(() => {
+    let avatarTimeoutId;
+    if (token && userData && !isAuthLoading) {
+      console.log('Scheduling avatar load in 30 seconds...');
+      avatarTimeoutId = setTimeout(() => {
+        console.log('Auto-loading avatar after 30 seconds');
+        loadUserAvatar();
+      }, 30000); // 30 секунд
+    }
+    return () => clearTimeout(avatarTimeoutId);
+  }, [token, userData, isAuthLoading, loadUserAvatar]);
+
+  // Автоматическая загрузка аватара спонсора через 35 секунд (чуть позже пользовательского)
+  useEffect(() => {
+    let sponsorAvatarTimeoutId;
+    if (token && userData && sponsor && !isAuthLoading) {
+      console.log('Scheduling sponsor avatar load in 35 seconds...');
+      sponsorAvatarTimeoutId = setTimeout(() => {
+        console.log('Auto-loading sponsor avatar after 35 seconds');
+        loadSponsorAvatar(sponsor.id);
+      }, 35000); // 35 секунд
+    }
+    return () => clearTimeout(sponsorAvatarTimeoutId);
+  }, [token, userData, sponsor, isAuthLoading, loadSponsorAvatar]);
 
   // Сохраняем currentPage в localStorage при изменении
   useEffect(() => {
@@ -386,7 +469,7 @@ const InvestorDashboard = () => {
 
   const handleModalWithdraw = useCallback(async () => {
     if (!modalAmount || isNaN(modalAmount) || Number(modalAmount) <= 0) {
-      alert('Enter a valid withdrawal amount!');
+      showError('Enter a valid withdrawal amount!');
       return;
     }
     setModalLoading(true);
@@ -415,7 +498,7 @@ const InvestorDashboard = () => {
     setModalAmount(''); 
     setWalletAddress('');
       } else {
-        alert(data.error || 'Withdrawal error');
+        showError(data.error || 'Withdrawal error');
       }
     } finally {
       setModalLoading(false);
@@ -424,7 +507,7 @@ const InvestorDashboard = () => {
 
   const handleModalDeposit = useCallback(async () => {
     if (!depositAmount || isNaN(depositAmount) || Number(depositAmount) <= 0) {
-      alert('Enter a valid deposit amount!');
+      showError('Enter a valid deposit amount!');
       return;
     }
     setDepositLoading(true);
@@ -445,12 +528,61 @@ const InvestorDashboard = () => {
         setDepositOpen(false);
         setDepositAmount('');
       } else {
-        alert(data.error || 'Deposit error');
+        showError(data.error || 'Deposit error');
       }
     } finally {
       setDepositLoading(false);
     }
   }, [depositAmount, token]);
+
+  // Image compression utility
+  const compressImage = useCallback((file, maxWidth = 100, maxHeight = 100, quality = 0.6) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        try {
+          // Calculate new dimensions
+          let { width, height } = img;
+          
+          if (width > height) {
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          }, 'image/jpeg', quality);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
 
   // Profile management functions
   const handleAvatarUpload = useCallback(async () => {
@@ -458,8 +590,58 @@ const InvestorDashboard = () => {
     
     setProfileLoading(true);
     try {
+      // Проверяем формат файла
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+      if (!allowedTypes.includes(avatarFile.type)) {
+        showError('Only PNG, JPG, JPEG, and SVG files are allowed');
+        setProfileLoading(false);
+        return;
+      }
+
+      // Проверяем размер файла
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      if (avatarFile.size > maxSize) {
+        showError('Image size must be less than 2MB');
+        setProfileLoading(false);
+        return;
+      }
+
+      // Сжимаем изображение (только для растровых форматов)
+      let fileToUpload = avatarFile;
+      if (avatarFile.type !== 'image/svg+xml') {
+        try {
+          const compressedFile = await compressImage(avatarFile);
+          fileToUpload = compressedFile;
+          
+          // Проверяем размер после сжатия
+          if (compressedFile.size > 30 * 1024) { // 30KB
+            // Если файл все еще слишком большой, попробуем сжать еще сильнее
+            if (compressedFile.size > 50 * 1024) { // 50KB
+              console.log('First compression resulted in', compressedFile.size, 'bytes, trying more aggressive compression');
+              const secondCompression = await compressImage(avatarFile, 80, 80, 0.4);
+              if (secondCompression.size < compressedFile.size) {
+                fileToUpload = secondCompression;
+              }
+            }
+            
+            if (fileToUpload.size > 50 * 1024) { // 50KB
+              showError('Image is too large even after compression. Please use a smaller image.');
+              setProfileLoading(false);
+              return;
+            } else if (fileToUpload.size > 30 * 1024) { // 30KB
+              showWarning('Image is large and may slow down login. Consider using a smaller image.');
+            }
+          }
+        } catch (error) {
+          console.error('Image compression error:', error);
+          showError('Failed to compress image. Please try a different image.');
+          setProfileLoading(false);
+          return;
+        }
+      }
+      
       const formData = new FormData();
-      formData.append('avatar', avatarFile);
+      formData.append('avatar', fileToUpload, avatarFile.name);
       
       const res = await fetch(`${API}/api/profile/avatar`, {
         method: 'PUT',
@@ -469,27 +651,28 @@ const InvestorDashboard = () => {
       
       const data = await res.json();
       if (res.ok) {
-        setUserData(u => ({ ...u, avatar: data.avatar }));
+        setUserAvatar(data.avatar); // Обновляем отдельное состояние аватара
         setShowAvatarModal(false);
         setAvatarFile(null);
+        showSuccess('Avatar updated successfully!');
       } else {
-        alert(data.error || 'Failed to update avatar');
+        showError(data.error || 'Failed to update avatar');
       }
     } catch (error) {
       console.error('Avatar update error:', error);
-      alert('Failed to update avatar');
+      showError('Failed to update avatar');
     }
     setProfileLoading(false);
   }, [avatarFile, token]);
 
   const handlePasswordChange = useCallback(async () => {
     if (newPassword !== confirmPassword) {
-      alert('New passwords do not match');
+      showError('New passwords do not match');
       return;
     }
     
     if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters long');
+      showError('Password must be at least 6 characters long');
       return;
     }
     
@@ -510,20 +693,20 @@ const InvestorDashboard = () => {
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        alert('Password updated successfully');
+        showSuccess('Password updated successfully');
       } else {
-        alert(data.error || 'Failed to update password');
+        showError(data.error || 'Failed to update password');
       }
     } catch (error) {
       console.error('Password update error:', error);
-      alert('Failed to update password');
+      showError('Failed to update password');
     }
     setProfileLoading(false);
   }, [currentPassword, newPassword, confirmPassword, token]);
 
   // --- Invest logic ---
-  const handleInvest = async (pkg) => {
-    if (!purchaseAmount || isNaN(purchaseAmount)) return alert('Enter amount');
+  const handleInvest = async (pkg, amount = purchaseAmount) => {
+    if (!amount || isNaN(amount)) return showError('Enter amount');
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/investments`, {
@@ -532,41 +715,66 @@ const InvestorDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ packageId: pkg.id, amount: Number(purchaseAmount) })
+        body: JSON.stringify({ packageId: pkg.id, amount: Number(amount) })
       });
       const data = await res.json();
       if (res.ok) {
-        setBonus(data.bonus);
-        setUserData(u => ({ ...u, balance: data.balance }));
+        // Инвестиция выполнена успешно - БЕЗ alert для скорости
+        console.log(`Investment of $${amount} in ${data.name} completed successfully!`);
+        
         setSelectedPackage(null);
         setPurchaseAmount('');
         
-        // Refresh user data to get updated investments
-        const profileRes = await fetch(`${API}/api/profile`, { 
-          headers: { Authorization: `Bearer ${token}` } 
-        });
-        const profileData = await profileRes.json();
-        setUserData(profileData);
+        // Обновляем баланс локально для скорости
+        setUserData(prev => ({
+          ...prev,
+          balance: prev.balance - Number(amount)
+        }));
         
-        // Refresh transactions
-        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
-          .then(res => res.json()).then(setTransactions);
+        // Обновляем транзакции и профиль в фоне для обновления таблицы инвестиций
+        Promise.all([
+          fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } })
+        ])
+        .then(async ([transactionsRes, profileRes]) => {
+          const [transactionsData, profileData] = await Promise.all([
+            transactionsRes.json(),
+            profileRes.json()
+          ]);
+          
+          // Обновляем данные напрямую
+          if (Array.isArray(transactionsData)) {
+            setTransactions(transactionsData);
+          }
+          
+          if (profileData && !profileData.error) {
+            setUserData(profileData);
+          }
+        })
+        .catch(error => console.error('Error updating data after investment:', error));
       } else {
-        alert(data.error || 'Investment error');
+        // Передаем ошибку в компонент через throw
+        throw new Error(data.error || 'Investment error');
       }
+    } catch (error) {
+      console.error('Investment error:', error);
+      // Передаем ошибку в компонент через throw
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
+
+
   // --- Navigation ---
   const navigation = [
     { id: 'dashboard', icon: Home, label: 'Dashboard' },
-    { id: 'history', icon: History, label: 'Transaction History' },
-    { id: 'packages', icon: Package, label: 'Investment Packages' },
-    { id: 'referrals', icon: Users, label: 'Referral System' },
-    { id: 'team', icon: UserPlus, label: 'Your team' },
-    { id: 'rankrewards', icon: Award, label: 'Rank Rewards' },
+    { id: 'history', icon: History, label: 'Finance' },
+    { id: 'packages', icon: Package, label: 'Packages' },
+    { id: 'referrals', icon: Users, label: 'Statistics' },
+    { id: 'team', icon: UserPlus, label: 'Team' },
+    { id: 'rankrewards', icon: Award, label: 'Bonuses' },
     { id: 'report', icon: BarChart3, label: 'Report' }
   ];
 
@@ -575,7 +783,14 @@ const InvestorDashboard = () => {
 
   // --- Main Render ---
   if (isAuthLoading) {
-    return <div />; // Можно заменить на спиннер
+    return (
+      <div className="glass-bg min-h-screen flex items-center justify-center">
+        <div className="glass-card p-8 text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-white">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
   }
   if (!token || !userData) {
     return <LoginPage onLogin={handleLogin} onRegister={handleRegister} loading={loading} authError={authError} />;
@@ -590,15 +805,17 @@ const InvestorDashboard = () => {
 
   return (
     <div className="glass-bg min-h-screen">
-      {/* Hamburger for mobile - absolutely topmost, outside all content */}
+      {/* Hamburger for mobile - positioned at top right */}
       <button
-        className="sm:hidden fixed top-1 left-1 z-50 bg-black/50 rounded-lg p-2 flex items-center justify-center"
+        className={`sm:hidden fixed top-4 right-4 z-50 bg-black/50 rounded-lg p-2 flex items-center justify-center transition-opacity ${
+          mobileSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
         onClick={() => setMobileSidebarOpen(true)}
         aria-label="Open menu"
       >
         <Menu size={28} className="text-orange-500" />
       </button>
-      <div className="mt-10 sm:mt-0">
+      <div className="mt-2 sm:mt-0">
         {/* Decorative elements */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-0 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl"></div>
@@ -649,13 +866,27 @@ const InvestorDashboard = () => {
                 onClick={() => setMobileSidebarOpen(false)}
               />
               {/* Drawer */}
-              <div className="fixed top-0 left-0 h-full w-24 bg-black/90 glass-sidebar z-50 flex flex-col items-center justify-between p-4 pt-14 animate-slide-in-left shadow-2xl">
-                <div className="flex flex-col items-center space-y-4">
+              <div className="fixed top-0 left-0 h-full w-full bg-black/90 glass-sidebar z-50 flex flex-col p-6 animate-slide-in-left shadow-2xl">
+                {/* Header with close button */}
+                <div className="flex items-center justify-between mb-8">
                   {/* Logo */}
-                  <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center mb-4 logo-glow">
-                    <div className="w-6 h-6 bg-black rounded-sm"></div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center logo-glow">
+                      <div className="w-6 h-6 bg-black rounded-sm"></div>
+                    </div>
+                    <span className="text-white font-bold text-lg">MARGIN SPACE</span>
                   </div>
-                  {/* Navigation */}
+                  {/* Close button */}
+                  <button
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className="w-8 h-8 bg-gray-800 border border-orange-500 rounded-lg flex items-center justify-center text-white hover:bg-gray-700 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                {/* Navigation */}
+                <div className="flex flex-col space-y-2 flex-1">
                   {navigation.map((item) => {
                     const Icon = item.icon;
                     const isActive = currentPage === item.id;
@@ -666,32 +897,40 @@ const InvestorDashboard = () => {
                           setMobileSidebarOpen(false);
                           setCurrentPage(item.id);
                         }}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors glass-button ${isActive ? 'text-white active' : 'text-gray-400 hover:text-white'}`}
-                        title={item.label}
+                        className={`flex items-center justify-center space-x-4 w-full p-4 rounded-xl transition-colors border border-white/10 text-center ${
+                          isActive 
+                            ? 'text-orange-400 border-orange-500/30' 
+                            : 'text-white hover:text-orange-400 hover:border-orange-500/30'
+                        }`}
                       >
                         <Icon size={20} />
+                        <span className="font-medium">{item.label}</span>
                       </button>
                     );
                   })}
                 </div>
+                
                 {/* Logout button at bottom */}
-                <div className="flex flex-col items-center">
+                <div className="mt-auto">
                   <button
                     onClick={() => {
                       setMobileSidebarOpen(false);
                       handleLogout();
                     }}
-                    className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors glass-button text-gray-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/30"
-                    title={logoutButton.label}
+                    className="flex items-center justify-center space-x-4 w-full p-4 rounded-xl transition-colors border border-white/10 text-white hover:text-red-400 hover:border-red-500/30"
                   >
-                    <logoutButton.icon size={20} />
+                    <LogOut size={20} />
+                    <span className="font-medium">Log out</span>
+                   
                   </button>
+                  
+
                 </div>
               </div>
             </>
           )}
           {/* Main Content */}
-          <div className="flex-1 p-2 sm:p-6 sm:pl-32 pt-4 sm:pt-6 min-w-0">
+          <div className="flex-1 p-2 sm:p-6 sm:pl-32 pt-0 sm:pt-6 min-w-0">
             {/* Dashboard */}
             {currentPage === 'dashboard' && (
               <div className="space-y-6">
@@ -734,51 +973,62 @@ const InvestorDashboard = () => {
                   </Card>
                   {/* User Profile Card */}
                   <Card>
-                    <h3 className="text-xl font-semibold text-white mb-4">You</h3>
-                    <div className="mb-4 flex items-center gap-4">
-                      <div className="relative">
-                        {userData.avatar ? (
+                    <h3 className="text-xl font-semibold text-white mb-4">You profile</h3>
+                    <div className="mb-4 flex items-center gap-3 sm:gap-4">
+                      <div className="relative flex-shrink-0">
+                        {userAvatar ? (
                           <img 
-                            src={userData.avatar} 
+                            src={userAvatar} 
                             alt="Avatar" 
-                            className="w-16 h-16 rounded-xl object-cover"
+                            className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-xl bg-gray-700 flex items-center justify-center text-2xl text-white">
-                            {userData.name?.[0] || 'U'}
+                          <div 
+                            className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gray-700 flex items-center justify-center text-xl sm:text-2xl text-white cursor-pointer hover:bg-gray-600 transition-colors"
+                            onClick={() => {
+                              console.log('Avatar clicked, loading...');
+                              loadUserAvatar(); // Загружаем аватар при клике
+                            }}
+                            title="Click to load avatar"
+                          >
+                            {userAvatar === null ? (
+                              <span>{userData.username?.[0] || 'U'}</span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">No Avatar</span>
+                            )}
                           </div>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <div className="text-lg font-semibold text-white">{userData.username}</div>
-                        <div className="text-gray-400 text-sm">{userData.email}</div>
-                        <div className="text-orange-400 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-base sm:text-lg font-semibold text-white truncate">{userData.username}</div>
+                        <div className="text-gray-400 text-xs sm:text-sm truncate">{userData.email}</div>
+                        <div className="text-orange-400 text-xs sm:text-sm">
                           {currentRank === 0 ? 'No rank' : `Rank ${currentRank}`}
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1 sm:gap-2 flex-shrink-0">
                         <button 
                           onClick={() => setShowPasswordModal(true)}
-                          className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-2 rounded-lg transition-all duration-200"
+                          className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-1.5 sm:p-2 rounded-lg transition-all duration-200"
                           title="Change Password"
                         >
-                          <Lock size={16} />
+                          <Lock size={14} className="sm:w-4 sm:h-4" />
                         </button>
                         <button 
                           onClick={() => setShowAvatarModal(true)}
-                          className="bg-orange-500/60 hover:bg-orange-500 text-white p-2 rounded-lg transition-all duration-200"
+                          className="bg-orange-500/60 hover:bg-orange-500 text-white p-1.5 sm:p-2 rounded-lg transition-all duration-200"
                           title="Change Avatar"
                         >
-                          <Camera size={16} />
+                          <Camera size={14} className="sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <div className="text-[rgb(249,115,22)] text-sm mb-1">Referral link</div>
+                        <div className="text-[rgb(249,115,22)] text-xs sm:text-sm mb-1">Referral link</div>
                         <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg p-2">
-                          <span className="text-gray-300 text-sm flex-1 truncate">{referralLink}</span>
-                          <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
+                          <span className="text-gray-300 text-xs sm:text-sm flex-1 truncate">{referralLink}</span>
+                          <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs flex-shrink-0" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
                         </div>
                       </div>
                       
@@ -786,8 +1036,8 @@ const InvestorDashboard = () => {
                       {nextRankData && (
                         <div className="mt-4">
                           <div className="flex justify-between text-xs text-gray-400 mb-1">
-                            <span>Progress to next rank</span>
-                            <span>{Math.round((turnover / nextRankData.turnover) * 100)}%</span>
+                            <span className="text-xs">Progress to next rank</span>
+                            <span className="text-xs">{Math.round((turnover / nextRankData.turnover) * 100)}%</span>
                           </div>
                           <div className="w-full bg-gray-700 rounded-full h-1.5">
                             <div 
@@ -806,17 +1056,20 @@ const InvestorDashboard = () => {
                 
                 {/* Your Investments Card - Full Width */}
                   <Card>
-                    <h3 className="text-xl font-semibold text-white mb-4">Your Investments</h3>
+                    <div className="mb-4">
+                      <h3 className="text-2xl font-bold text-white mb-1">Your Investments</h3>
+                      <p className="text-gray-300 opacity-70 text-sm">View your active investment packages and earnings</p>
+                    </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-gray-400 border-b border-gray-700">
-                          <th className="text-left py-3 px-3">Package</th>
-                          <th className="text-left py-3 px-3">Amount</th>
-                          <th className="text-left py-3 px-3">Earned</th>
-                          <th className="text-left py-3 px-3">Start Date</th>
-                          <th className="text-left py-3 px-3">End Date</th>
-                          <th className="text-left py-3 px-3">Status</th>
+                        <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+                          <tr>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Package</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Amount</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Earned</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Start Date</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">End Date</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1008,8 +1261,8 @@ const InvestorDashboard = () => {
                 </div>
               </div>
             )}
-            {currentPage === 'packages' && <InvestmentPackagesPage userData={userData} packages={packages} onInvest={handleInvest} loading={loading} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} purchaseAmount={purchaseAmount} setPurchaseAmount={setPurchaseAmount} bonus={bonus} setBonus={setBonus} />}
-            {currentPage === 'referrals' && <ReferralSystemPage userData={userData} referralTree={referralTree} referralLink={referralLink} packages={packages} transactions={transactions} sponsor={sponsor} currentRank={currentRank} />}
+            {currentPage === 'packages' && <SimpleInvestmentPage userData={userData} packages={packages} onInvest={handleInvest} loading={loading} />}
+            {currentPage === 'referrals' && <ReferralSystemPage userData={userData} referralTree={referralTree} referralLink={referralLink} packages={packages} transactions={transactions} sponsor={sponsor} currentRank={currentRank} sponsorAvatar={sponsorAvatar} loadSponsorAvatar={loadSponsorAvatar} userAvatar={userAvatar} loadUserAvatar={loadUserAvatar} />}
             {currentPage === 'team' && <TeamPage referralTree={referralTree} userData={userData} tableView={tableView} currentRank={currentRank} />}
             {currentPage === 'rankrewards' && <RankRewardsPage onRankUpdate={handleRankUpdate} userData={userData} />}
             {currentPage === 'report' && <ReportPage userData={userData} />}
@@ -1027,14 +1280,28 @@ const InvestorDashboard = () => {
                 <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select Image</label>
                 <input 
                   type="file" 
-                  accept="image/*"
-                  onChange={(e) => setAvatarFile(e.target.files[0])}
+                  accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/jpg,image/svg+xml"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+                      if (!allowedTypes.includes(file.type)) {
+                        showError('Only PNG, JPG, JPEG, and SVG files are allowed');
+                        e.target.value = '';
+                        return;
+                      }
+                      setAvatarFile(file);
+                    }
+                  }}
                   className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
                 />
+                <div className="text-xs text-gray-400 mt-1">
+                  Supported formats: PNG, JPG, JPEG, SVG. Max size: 2MB. Images will be automatically compressed to 100x100px for optimal performance
+                </div>
               </div>
               {avatarFile && (
                 <div className="text-sm text-gray-300">
-                  Selected: {avatarFile.name}
+                  Selected: {avatarFile.name} ({(avatarFile.size / 1024).toFixed(1)} KB)
                 </div>
               )}
               <div className="flex gap-2">
@@ -1155,6 +1422,9 @@ const InvestorDashboard = () => {
         balance={userData.balance}
         savedWallet={userData.wallet}
       />
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 };

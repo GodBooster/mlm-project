@@ -1,6 +1,7 @@
 //nano prisma/seed.js на сервере запустить
 
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcrypt'
 
 const prisma = new PrismaClient()
 
@@ -14,6 +15,7 @@ async function main() {
     {
       name: 'Member',
       minAmount: 100,
+      maxAmount: 999,
       monthlyYield: 22,
       duration: 30,
       isActive: true
@@ -21,6 +23,7 @@ async function main() {
     {
       name: 'Adept', 
       minAmount: 1000,
+      maxAmount: 4999,
       monthlyYield: 25,
       duration: 30,
       isActive: true
@@ -28,6 +31,7 @@ async function main() {
     {
       name: 'Visionary',
       minAmount: 5000,
+      maxAmount: 9999,
       monthlyYield: 28,
       duration: 30,
       isActive: true
@@ -35,6 +39,7 @@ async function main() {
     {
       name: 'Elite',
       minAmount: 10000,
+      maxAmount: 24999,
       monthlyYield: 30,
       duration: 30,
       isActive: true
@@ -42,6 +47,7 @@ async function main() {
     {
       name: 'Fortune',
       minAmount: 25000,
+      maxAmount: 100000,
       monthlyYield: 35,
       duration: 30,
       isActive: true
@@ -83,10 +89,11 @@ async function main() {
   ]
 
   for (const admin of admins) {
+    const hashedPassword = await bcrypt.hash(admin.password, 10)
     await prisma.user.upsert({
       where: { email: admin.email },
-      update: {},
-      create: admin
+      update: { password: hashedPassword },
+      create: { ...admin, password: hashedPassword }
     })
   }
 
@@ -129,10 +136,11 @@ async function main() {
   ]
 
   for (const user of testUsers) {
+    const hashedPassword = await bcrypt.hash(user.password, 10)
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {},
-      create: user
+      update: { password: hashedPassword },
+      create: { ...user, password: hashedPassword }
     })
   }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, DollarSign, Package, Settings, LogOut, Eye, EyeOff, Search, Filter, Download } from 'lucide-react';
+import { Users, DollarSign, Package, Settings, LogOut, Eye, EyeOff, Search, Filter, Download, Plus } from 'lucide-react';
 import AdminAddTransaction from './AdminAddTransaction';
 
 // Card without transparency
@@ -28,6 +28,7 @@ export default function AdminDashboard() {
   const [editForm, setEditForm] = useState({
     name: '',
     minAmount: '',
+    maxAmount: '',
     monthlyYield: '',
     duration: '',
     isActive: true
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
   }
   async function handleHold(id) {
     // Просто меняем статус на HOLD (если потребуется, реализовать на backend)
-    alert('Hold action not implemented yet');
+    console.log('Hold action not implemented yet'); // TODO: Add toast notification
   }
   async function handleCheck(id) {
     setActionLoadingId(id);
@@ -221,6 +222,7 @@ export default function AdminDashboard() {
     setEditForm({
       name: pkg.name,
       minAmount: pkg.minAmount.toString(),
+      maxAmount: pkg.maxAmount ? pkg.maxAmount.toString() : '',
       monthlyYield: pkg.monthlyYield.toString(),
       duration: pkg.duration.toString(),
       isActive: pkg.isActive
@@ -512,7 +514,7 @@ export default function AdminDashboard() {
 
       <div className="flex relative z-10">
         {/* Sidebar */}
-        <div className="fixed left-6 top-6 w-20 bg-gray-900 shadow-lg rounded-2xl p-4 flex-col items-center space-y-4 z-20">
+        <div className="fixed left-6 top-6 w-64 bg-gray-900 shadow-lg rounded-2xl p-4 flex-col items-center space-y-4 z-20">
           {/* Logo */}
           <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center mb-4 logo-glow">
             <div className="w-6 h-6 bg-black rounded-sm"></div>
@@ -528,22 +530,30 @@ export default function AdminDashboard() {
                   if (item.id === 'logout') handleLogout();
                   else setCurrentPage(item.id);
                 }}
-                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isActive ? 'text-white active' : 'text-gray-400 hover:text-white'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' 
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                }`}
                 title={item.label}
               >
                 <Icon size={20} />
+                <span className="text-sm font-medium">{item.label}</span>
               </button>
             );
           })}
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-2 sm:p-6 sm:pl-32 pt-4 sm:pt-6 min-w-0">
+        <div className="flex-1 p-2 sm:p-6 sm:pl-80 pt-4 sm:pt-6 min-w-0">
           {/* Overview */}
           {currentPage === 'overview' && (
             <div className="space-y-6">
               <Card>
-                <h3 className="text-xl font-semibold text-white mb-6">System Overview</h3>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-white mb-1">System Overview</h3>
+                  <p className="text-gray-300 opacity-70 text-sm">View system statistics and performance metrics</p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 shadow-lg rounded-2xl p-4 text-center">
                     <div className="text-gray-400 text-sm">Total Users</div>
@@ -566,22 +576,25 @@ export default function AdminDashboard() {
 
               {/* Новый Withdrawal Panel: */}
               <Card>
-                <h3 className="text-xl font-semibold text-white mb-6">Withdrawal Panel</h3>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-white mb-1">Withdrawal Panel</h3>
+                  <p className="text-gray-300 opacity-70 text-sm">Manage user withdrawal requests and approvals</p>
+                </div>
                 {withdrawals.length === 0 ? (
                   <div className="text-gray-400 text-center py-4">No pending withdrawals</div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                     {/* Массовые кнопки */}
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2 mb-4">
                       <button
-                        className="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-xs disabled:opacity-50"
+                        className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
                         onClick={handleBatchApprove}
                         disabled={selectedWithdrawals.length === 0 || batchApproving}
                       >
                         {batchApproving ? 'Processing...' : 'Approve Selected'}
                       </button>
                       <button
-                        className="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-xs disabled:opacity-50"
+                        className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
                         onClick={handleBatchReject}
                         disabled={selectedWithdrawals.length === 0 || batchApproving}
                       >
@@ -589,20 +602,20 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-gray-900/80">
-                        <tr className="text-gray-400 border-b border-gray-700">
-                          <th className="py-3 px-3"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /></th>
-                          <th className="text-left py-3 px-3">Date</th>
-                          <th className="text-left py-3 px-3">User</th>
-                          <th className="text-left py-3 px-3">Amount</th>
-                          <th className="text-left py-3 px-3">Wallet</th>
-                          <th className="text-left py-3 px-3">Status</th>
-                          <th className="text-left py-3 px-3">Actions</th>
+                      <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90 backdrop-blur-sm">
+                        <tr>
+                          <th className="py-3 px-3 rounded-tl-lg"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /></th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Date</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">User</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Amount</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Wallet</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase">Status</th>
+                          <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {withdrawals.map((tx) => (
-                          <tr key={tx.id} className="border-b border-gray-800">
+                          <tr key={tx.id} className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
                             <td className="py-2 px-3">
                               <input type="checkbox" checked={selectedWithdrawals.includes(tx.id)} onChange={() => toggleSelect(tx.id)} />
                             </td>
@@ -632,15 +645,15 @@ export default function AdminDashboard() {
                             <td className="py-2 px-3 flex gap-2">
                               {tx.status === 'PENDING' && (
                                 <>
-                                  <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Approve'}</button>
-                                  <button className="bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleCheck(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Check'}</button>
-                                  <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Reject'}</button>
+                                  <button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Approve'}</button>
+                                  <button className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none" onClick={() => handleCheck(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Check'}</button>
+                                  <button className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Reject'}</button>
                                 </>
                               )}
                               {tx.status === 'CHECK' && (
                                 <>
-                                  <button className="bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Approve'}</button>
-                                  <button className="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Reject'}</button>
+                                  <button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none" onClick={() => handleApprove(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Approve'}</button>
+                                  <button className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none" onClick={() => handleReject(tx.id)} disabled={actionLoadingId === tx.id}>{actionLoadingId === tx.id ? 'Processing...' : 'Reject'}</button>
                                 </>
                               )}
                             </td>
@@ -657,8 +670,11 @@ export default function AdminDashboard() {
           {/* Users */}
           {currentPage === 'users' && (
             <Card>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-white">Users Management</h3>
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-1">
+                  <h3 className="text-2xl font-bold text-white">Users Management</h3>
+                  <p className="text-gray-300 opacity-70 text-sm">Manage system users and their accounts</p>
+                </div>
                 <div className="flex gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -672,22 +688,22 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-900/80">
-                    <tr className="text-gray-400 border-b border-gray-700">
-                      <th className="text-left py-3 px-3">ID</th>
-                      <th className="text-left py-3 px-3">Username</th>
-                      <th className="text-left py-3 px-3">Email</th>
-                      <th className="text-left py-3 px-3">Balance</th>
-                      <th className="text-left py-3 px-3">Rank</th>
-                      <th className="text-left py-3 px-3">Joined</th>
-                      <th className="text-left py-3 px-3">Actions</th>
+                  <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90 backdrop-blur-sm">
+                    <tr>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">ID</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Username</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Email</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Balance</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Rank</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Joined</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredUsers.map((user) => (
-                      <tr key={user.id} className="border-b border-gray-800">
+                      <tr key={user.id} className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
                         <td className="py-2 px-3 text-gray-300">{user.id}</td>
                         <td className="py-2 px-3 text-white">{user.username}</td>
                         <td className="py-2 px-3 text-white">{user.email}</td>
@@ -697,8 +713,8 @@ export default function AdminDashboard() {
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-2 px-3">
-                          <button className="text-blue-400 hover:text-blue-300 text-sm mr-2" onClick={() => handleViewUser(user)}>View</button>
-                          <button className="text-purple-400 hover:text-purple-300 text-sm" onClick={() => handleShowHistory(user)}>History</button>
+                          <button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 mr-2" onClick={() => handleViewUser(user)}>View</button>
+                          <button className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105" onClick={() => handleShowHistory(user)}>History</button>
                         </td>
                       </tr>
                     ))}
@@ -711,12 +727,16 @@ export default function AdminDashboard() {
           {/* Transactions */}
           {currentPage === 'transactions' && (
             <Card>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-white">Transactions</h3>
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-1">
+                  <h3 className="text-2xl font-bold text-white">Transactions</h3>
+                  <p className="text-gray-300 opacity-70 text-sm">View and manage all system transactions</p>
+                </div>
                 <button 
                   onClick={() => setShowAddTransactionModal(true)}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
                 >
+                  <Plus size={18} />
                   Add Transaction
                 </button>
                 <div className="flex gap-2">
@@ -742,21 +762,21 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-900/80">
-                    <tr className="text-gray-400 border-b border-gray-700">
-                      <th className="text-left py-3 px-3">Date</th>
-                      <th className="text-left py-3 px-3">User</th>
-                      <th className="text-left py-3 px-3">Type</th>
-                      <th className="text-left py-3 px-3">Amount</th>
-                      <th className="text-left py-3 px-3">Status</th>
-                      <th className="text-left py-3 px-3">Description</th>
+                  <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90 backdrop-blur-sm">
+                    <tr>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Date</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">User</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Type</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Amount</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Status</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Description</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredTransactions.map((tx, i) => (
-                      <tr key={i} className="border-b border-gray-800">
+                      <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
                         <td className="py-2 px-3 text-gray-300">
                           {new Date(tx.createdAt).toLocaleDateString()}
                         </td>
@@ -787,31 +807,35 @@ export default function AdminDashboard() {
           {/* Packages */}
           {currentPage === 'packages' && (
             <Card>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-white">Investment Packages</h3>
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-1">
+                  <h3 className="text-2xl font-bold text-white">Investment Packages</h3>
+                  <p className="text-gray-300 opacity-70 text-sm">Manage investment packages and their settings</p>
+                </div>
                 <button 
                   onClick={handleAddPackage}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
                 >
+                  <Plus size={18} />
                   Add Package
                 </button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-900/80">
-                    <tr className="text-gray-400 border-b border-gray-700">
-                      <th className="text-left py-3 px-3">ID</th>
-                      <th className="text-left py-3 px-3">Name</th>
-                      <th className="text-left py-3 px-3">Min Amount</th>
-                      <th className="text-left py-3 px-3">Monthly Yield</th>
-                      <th className="text-left py-3 px-3">Duration</th>
-                      <th className="text-left py-3 px-3">Status</th>
-                      <th className="text-left py-3 px-3">Actions</th>
+                  <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90 backdrop-blur-sm">
+                    <tr>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">ID</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Name</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Min Amount</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Monthly Yield</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Duration</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase">Status</th>
+                      <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {packages.map((pkg) => (
-                      <tr key={pkg.id} className="border-b border-gray-800">
+                      <tr key={pkg.id} className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
                         <td className="py-2 px-3 text-gray-300">{pkg.id}</td>
                         <td className="py-2 px-3 text-white">{pkg.name}</td>
                         <td className="py-2 px-3 text-green-400">${pkg.minAmount?.toLocaleString()}</td>
@@ -827,13 +851,13 @@ export default function AdminDashboard() {
                         <td className="py-2 px-3">
                           <button 
                             onClick={() => handleEditPackage(pkg)}
-                            className="text-blue-400 hover:text-blue-300 text-sm mr-2"
+                            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 mr-2"
                           >
                             Edit
                           </button>
                           <button 
                             onClick={() => handleDeletePackage(pkg.id)}
-                            className="text-red-400 hover:text-red-300 text-sm"
+                            className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
                           >
                             Delete
                           </button>
@@ -850,7 +874,7 @@ export default function AdminDashboard() {
 
       {/* Edit Package Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-gray-900 p-8 rounded-2xl max-w-md w-full">
             <h3 className="text-2xl font-bold text-white mb-6">
               {editingPackage ? 'Edit Package' : 'Add Package'}
@@ -875,6 +899,18 @@ export default function AdminDashboard() {
                   step="0.01"
                   value={editForm.minAmount}
                   onChange={(e) => setEditForm(f => ({ ...f, minAmount: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 mb-1">Max Amount ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editForm.maxAmount}
+                  onChange={(e) => setEditForm(f => ({ ...f, maxAmount: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
                   required
                 />
@@ -914,18 +950,18 @@ export default function AdminDashboard() {
                 <label htmlFor="isActive" className="text-gray-300">Active</label>
               </div>
               
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
                 >
                   {saving ? 'Saving...' : (editingPackage ? 'Update' : 'Create')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                 >
                   Cancel
                 </button>
@@ -983,22 +1019,22 @@ export default function AdminDashboard() {
                 <div className="text-gray-300 mb-1"><b>Registered:</b> {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString() : '-'}</div>
               </div>
             </div>
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mb-4 flex-wrap">
               <button
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                 onClick={() => setEditMode(true)}
               >
                 Edit
               </button>
               <button
-                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                 onClick={() => setShowProfileModal(false)}
               >
                 Close
               </button>
               {selectedUser.isBlocked ? (
                 <button
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                   onClick={async () => {
                     await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}/unblock`, {
                       method: 'PUT',
@@ -1012,7 +1048,7 @@ export default function AdminDashboard() {
                 </button>
               ) : (
                 <button
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg"
+                  className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                   onClick={async () => {
                     await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}/block`, {
                       method: 'PUT',
@@ -1026,7 +1062,7 @@ export default function AdminDashboard() {
                 </button>
               )}
               <button
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                 onClick={async () => {
                   if (window.confirm('Are you sure you want to delete this user?')) {
                     await fetch(`${import.meta.env.VITE_API_URL}/api/admin/user/${selectedUser.id}`, {
@@ -1134,17 +1170,17 @@ export default function AdminDashboard() {
                   onChange={e => setEditUserForm(f => ({ ...f, isAdmin: e.target.checked }))}
                 />
               </div>
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditMode(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                 >
                   Cancel
                 </button>
@@ -1159,7 +1195,10 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
           <div className="bg-gray-900 rounded-2xl shadow-lg p-6 w-full max-w-2xl relative">
             <button className="absolute top-4 right-4 text-gray-400 hover:text-white" onClick={() => setShowHistoryModal(false)}>&times;</button>
-            <h3 className="text-xl font-semibold text-white mb-4">Transaction History for {historyUser?.username || historyUser?.email}</h3>
+            <div className="mb-4">
+              <h3 className="text-2xl font-bold text-white mb-1">Transaction History for {historyUser?.username || historyUser?.email}</h3>
+              <p className="text-gray-300 opacity-70 text-sm">View user's transaction activity and history</p>
+            </div>
             {loadingHistory ? (
               <div className="text-white">Loading...</div>
             ) : (
@@ -1224,15 +1263,15 @@ export default function AdminDashboard() {
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
               />
             </div>
-            <div className="flex gap-2 pt-4">
+            <div className="flex gap-3 pt-4">
               <button
                 onClick={saveWalletModal}
                 disabled={walletModalSaving}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
               >{walletModalSaving ? 'Saving...' : 'Save'}</button>
               <button
                 onClick={closeWalletModal}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
+                className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
               >Cancel</button>
             </div>
           </div>

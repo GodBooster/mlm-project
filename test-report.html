@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Report API</title>
+</head>
+<body>
+    <h1>Test Report API</h1>
+    <div id="output"></div>
+    
+    <script>
+        async function testAPI() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Симулируем токен (в реальном приложении он берется из localStorage)
+                const token = 'test-token';
+                
+                const response = await fetch('http://localhost:3000/api/defi-positions/7', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('API Response:', data);
+                    
+                    // Симулируем преобразование как в ReportPage
+                    const positions = data.map(pos => ({
+                        ...pos,
+                        status: pos.status.toLowerCase() === 'farming' ? 'farming' : 'unstaked'
+                    }));
+                    
+                    const activePositions = positions.filter(p => p.status === 'farming');
+                    const closedPositions = positions.filter(p => p.status === 'unstaked');
+                    
+                    output.innerHTML = `
+                        <h2>Результаты:</h2>
+                        <p>Всего позиций: ${positions.length}</p>
+                        <p>Активных (farming): ${activePositions.length}</p>
+                        <p>Закрытых (unstaked): ${closedPositions.length}</p>
+                        
+                        <h3>Детали позиций:</h3>
+                        <pre>${JSON.stringify(positions, null, 2)}</pre>
+                        
+                        <h3>Закрытые позиции:</h3>
+                        <pre>${JSON.stringify(closedPositions, null, 2)}</pre>
+                    `;
+                } else {
+                    const errorText = await response.text();
+                    output.innerHTML = `<p>Ошибка: ${response.status} - ${errorText}</p>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<p>Ошибка: ${error.message}</p>`;
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html> 

@@ -3,16 +3,19 @@ import 'dotenv/config';
 import express from 'express'
 import bcrypt from 'bcrypt'
 import multer from 'multer'
+import sharp from 'sharp'
 import { PrismaClient, TransactionStatus, PositionStatus } from '@prisma/client'
 import scheduler from './jobs/scheduler.js'
 import investmentService from './services/investment-service.js'
 import referralService from './services/referral-service.js'
 import rankService from './services/rank-service.js'
 import rankRewardService, { MLM_RANKS } from './services/rank-reward-service.js'
+import optimizedRankRewardService from './optimized-rank-service.js'
 import { authenticateToken, generateToken } from './middleware/auth.js'
 import nodemailer from 'nodemailer'
 import crypto from 'crypto'
 import emailService from './services/email-service.js'
+import systemUpdater from './system-updater.js'
 
 const prisma = new PrismaClient()
 const app = express()
@@ -45,7 +48,7 @@ app.use((req, res, next) => {
 const storage = multer.memoryStorage()
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true)
@@ -57,6 +60,9 @@ const upload = multer({
 
 // Start scheduler once
 scheduler.start().catch(console.error)
+
+// Start system updater
+systemUpdater.start().catch(console.error)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -628,13 +634,40 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      include: {
+      select: {
+        // Исключаем avatar для скорости - он будет загружаться отдельно при необходимости
+        id: true,
+        email: true,
+        bonus: true,
+        createdAt: true,
+        balance: true,
+        rank: true,
+        referralCode: true,
+        referredBy: true,
+        updatedAt: true,
+        username: true,
+        wallet: true,
+        isAdmin: true,
+        emailVerificationExpires: true,
+        emailVerificationToken: true,
+        emailVerified: true,
+        isBlocked: true,
+        lastLogin: true,
         investments: {
           include: {
-            package: true
+            package: {
+              select: {
+                id: true,
+                name: true,
+                minAmount: true,
+                monthlyYield: true,
+                duration: true,
+                isActive: true,
+                percent: true
+              }
+            }
           }
-        },
-        transactions: true
+        }
       }
     })
 
@@ -651,6 +684,30 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to get profile' })
   }
 })
+
+// Get user avatar separately for performance
+app.get('/api/profile/avatar', authenticateToken, async (req, res) => {
+  console.log('GET /api/profile/avatar called');
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { avatar: true }
+    })
+
+    console.log('User found:', !!user, 'Avatar:', !!user?.avatar);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    res.json({ avatar: user.avatar })
+  } catch (error) {
+    console.error('Avatar error:', error)
+    res.status(500).json({ error: 'Failed to get avatar' })
+  }
+})
+
+
 
 // Get user wallet
 app.get('/api/wallet', authenticateToken, async (req, res) => {
@@ -874,18 +931,28 @@ app.post('/api/investments', authenticateToken, async (req, res) => {
     
     console.log('[INVESTMENTS] userId:', userId, 'packageId:', packageId, 'amount:', amount)
     
-    const investment = await investmentService.createInvestment(userId, packageId, amount)
-    
-    // Get updated user data
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: userId }
+    // Получаем только package name для ответа
+    const packageData = await prisma.investmentPackage.findUnique({
+      where: { id: packageId },
+      select: { name: true }
     })
     
+    if (!packageData) {
+      return res.status(400).json({ error: 'Package not found' })
+    }
+    
+    // Выполняем инвестицию синхронно (все проверки внутри сервиса)
+    const investment = await investmentService.createInvestment(userId, packageId, amount)
+    
+    console.log('[INVESTMENTS] Investment created successfully:', investment.id)
+    
+    // Возвращаем мгновенный результат
     res.json({
       success: true,
-      investment,
-      balance: updatedUser.balance,
-      bonus: updatedUser.bonus || 0
+      message: 'Investment completed successfully',
+      investment: investment,
+      name: packageData.name,
+      amount: amount
     })
   } catch (error) {
     console.error('[INVESTMENTS] ERROR:', error)
@@ -893,32 +960,8 @@ app.post('/api/investments', authenticateToken, async (req, res) => {
   }
 })
 
-// New investment endpoint for authenticated users
-app.post('/api/invest', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id
-    const { packageId, amount } = req.body
-    
-    console.log('[INVEST] userId:', userId, 'packageId:', packageId, 'amount:', amount)
-    
-    const investment = await investmentService.createInvestment(userId, packageId, amount)
-    
-    // Get updated user data
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: userId }
-    })
-    
-    res.json({
-      success: true,
-      investment,
-      balance: updatedUser.balance,
-      bonus: updatedUser.bonus || 0
-    })
-  } catch (error) {
-    console.error('[INVEST] ERROR:', error)
-    res.status(400).json({ error: error.message })
-  }
-})
+
+
 
 app.get('/api/investments/user', authenticateToken, async (req, res) => {
   try {
@@ -1112,6 +1155,33 @@ app.post('/api/queue/bonus', async (req, res) => {
   }
 })
 
+// Get avatar by user ID (for sponsor avatars, etc.) - должен быть ПЕРЕД /api/users для избежания конфликта
+app.get('/api/user/:id/avatar', authenticateToken, async (req, res) => {
+  console.log('GET /api/user/:id/avatar called for ID:', req.params.id);
+  try {
+    const userId = parseInt(req.params.id);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatar: true, username: true }
+    })
+
+    console.log('User found:', !!user, 'Avatar:', !!user?.avatar);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    res.json({ avatar: user.avatar, username: user.username })
+  } catch (error) {
+    console.error('User avatar error:', error)
+    res.status(500).json({ error: 'Failed to get user avatar' })
+  }
+})
+
 // User routes
 app.get('/api/users', async (req, res) => {
   try {
@@ -1212,18 +1282,18 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
     const userId = req.user.id
     console.log('[RANK-REWARDS] userId:', userId)
     
-    // Только вычисляем оборот по рефералам
-    const turnover = await rankRewardService.getUserTurnover(userId)
+    // Используем оптимизированный сервис с кэшированием
+    const turnover = await optimizedRankRewardService.getUserTurnover(userId)
     console.log('[RANK-REWARDS] turnover:', turnover)
     
     // currentRank только по обороту, не из базы
-    const currentRank = rankRewardService.getUserRank(turnover)
+    const currentRank = optimizedRankRewardService.getUserRank(turnover)
     console.log('[RANK-REWARDS] currentRank:', currentRank)
     
-    let nextRank = rankRewardService.getNextRank(turnover)
+    let nextRank = optimizedRankRewardService.getNextRank(turnover)
     console.log('[RANK-REWARDS] nextRank:', nextRank)
     
-    const claimed = await rankRewardService.getClaimedRewards(userId)
+    const claimed = await optimizedRankRewardService.getClaimedRewards(userId)
     console.log('[RANK-REWARDS] claimed:', claimed)
     
     // Явно: если оборот = 0, nextRank всегда первый ранг
@@ -1249,7 +1319,7 @@ app.get('/api/rank-rewards', authenticateToken, async (req, res) => {
       totalClaimedCash,
       lastClaimedPrize,
       ranks: MLM_RANKS,
-      debug: 'NEW LOGIC WORKS', // временное поле для проверки
+      debug: 'OPTIMIZED SERVICE WORKS', // временное поле для проверки
     })
   } catch (e) {
     console.error('[RANK-REWARDS] ERROR:', e)
@@ -1265,7 +1335,7 @@ app.post('/api/rank-rewards/claim', authenticateToken, async (req, res) => {
     const { level, rewardType = 'Cash' } = req.body
     console.log('[CLAIM_REWARD] Request:', { userId, level, rewardType })
     
-    const result = await rankRewardService.claimReward(userId, Number(level), rewardType)
+    const result = await optimizedRankRewardService.claimReward(userId, Number(level), rewardType)
     console.log('[CLAIM_REWARD] Success:', result)
     res.json(result)
   } catch (e) {
@@ -1283,8 +1353,63 @@ app.put('/api/profile/avatar', authenticateToken, upload.single('avatar'), async
       return res.status(400).json({ error: 'No image file provided' })
     }
     
-    // Convert image to base64
-    const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
+    // Check file size (should be already checked by multer, but double-check)
+    if (req.file.size > 2 * 1024 * 1024) { // 2MB
+      return res.status(400).json({ error: 'File size too large. Maximum 2MB allowed.' })
+    }
+    
+    let processedBuffer = req.file.buffer
+    let mimeType = req.file.mimetype
+    
+    // Compress image using Sharp (only for raster images, not SVG)
+    if (req.file.mimetype !== 'image/svg+xml') {
+      try {
+        processedBuffer = await sharp(req.file.buffer)
+          .resize(100, 100, { 
+            fit: 'cover',
+            position: 'center'
+          })
+          .jpeg({ 
+            quality: 60,
+            progressive: true 
+          })
+          .toBuffer()
+        
+        mimeType = 'image/jpeg'
+        console.log(`Image compressed: Original ${req.file.size} bytes → Compressed ${processedBuffer.length} bytes`)
+      } catch (sharpError) {
+        console.error('Sharp compression error:', sharpError.message)
+        
+        // Check if it's an unsupported format error
+        if (sharpError.message.includes('bad seek') || 
+            sharpError.message.includes('heif') || 
+            sharpError.message.includes('Input file is missing') ||
+            sharpError.message.includes('Input buffer contains unsupported image format')) {
+          return res.status(400).json({ 
+            error: 'Unsupported image format. Please use PNG, JPG, JPEG, or SVG files only.' 
+          })
+        }
+        
+        // For other errors, fallback to original if size permits
+        console.log('Falling back to original image due to compression error')
+        processedBuffer = req.file.buffer
+      }
+    }
+    
+    // Convert processed image to base64
+    const base64Image = `data:${mimeType};base64,${processedBuffer.toString('base64')}`
+    
+    // Check base64 size (base64 is ~33% larger than original)
+    const base64Size = Buffer.byteLength(base64Image, 'utf8')
+    const maxBase64Size = 100 * 1024 // 100KB for base64 string
+    
+    if (base64Size > maxBase64Size) {
+      return res.status(400).json({ 
+        error: `Processed image is too large (${Math.round(base64Size/1024)}KB). Please use a smaller image or reduce quality.`
+      })
+    }
+    
+    console.log(`Avatar upload: Original size: ${req.file.size} bytes, Processed size: ${processedBuffer.length} bytes, Base64 size: ${base64Size} bytes`)
     
     // Update user avatar
     await prisma.user.update({
@@ -1299,7 +1424,11 @@ app.put('/api/profile/avatar', authenticateToken, upload.single('avatar'), async
     })
   } catch (error) {
     console.error('Avatar update error:', error)
-    res.status(500).json({ error: 'Failed to update avatar' })
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      res.status(400).json({ error: 'File size too large. Maximum 2MB allowed.' })
+    } else {
+      res.status(500).json({ error: 'Failed to update avatar' })
+    }
   }
 })
 
@@ -1458,12 +1587,17 @@ app.get('/api/admin/packages', authenticateToken, requireAdmin, async (req, res)
 
 app.post('/api/admin/packages', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, minAmount, monthlyYield, duration, isActive } = req.body
+    const { name, minAmount, maxAmount, monthlyYield, duration, isActive } = req.body
+    
+    if (!maxAmount) {
+      return res.status(400).json({ error: 'Max amount is required' })
+    }
     
     const investmentPackage = await prisma.investmentPackage.create({
       data: {
         name,
         minAmount: parseFloat(minAmount),
+        maxAmount: parseFloat(maxAmount),
         monthlyYield: parseFloat(monthlyYield),
         duration: parseInt(duration),
         isActive: isActive !== undefined ? isActive : true
@@ -1479,13 +1613,18 @@ app.post('/api/admin/packages', authenticateToken, requireAdmin, async (req, res
 app.put('/api/admin/packages/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const { name, minAmount, monthlyYield, duration, isActive } = req.body
+    const { name, minAmount, maxAmount, monthlyYield, duration, isActive } = req.body
+    
+    if (!maxAmount) {
+      return res.status(400).json({ error: 'Max amount is required' })
+    }
     
     const investmentPackage = await prisma.investmentPackage.update({
       where: { id: parseInt(id) },
       data: {
         name,
         minAmount: parseFloat(minAmount),
+        maxAmount: parseFloat(maxAmount),
         monthlyYield: parseFloat(monthlyYield),
         duration: parseInt(duration),
         isActive: isActive !== undefined ? isActive : true
@@ -1754,19 +1893,15 @@ app.put('/api/admin/withdrawals/:id/hold', authenticateToken, requireAdmin, asyn
 });
 
 // DeFi Pool Position endpoints
-app.get('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
+// Системный endpoint для демонстрации (без аутентификации)
+app.get('/api/defi-positions/system', async (req, res) => {
   try {
-    const { userId } = req.params;
-    
-    // Проверяем права доступа
-    if (req.user.id !== parseInt(userId) && !req.user.isAdmin) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
+    // Возвращаем ВСЕ позиции из базы данных (системные данные для всех пользователей)
     const positions = await prisma.defiPosition.findMany({
-      where: { userId: parseInt(userId) },
       orderBy: { createdAt: 'desc' }
     });
+
+    console.log('[DEFI POSITIONS GET] System mode - returning all positions:', positions.length);
 
     res.json(positions);
   } catch (error) {
@@ -1775,8 +1910,79 @@ app.get('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Для обычных пользователей возвращаем их данные
+    const positions = await prisma.defiPosition.findMany({
+      where: { userId: parseInt(userId) },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    console.log('[DEFI POSITIONS GET] User ID:', userId);
+    console.log('[DEFI POSITIONS GET] Found positions:', positions.length);
+    console.log('[DEFI POSITIONS GET] Position statuses:', positions.map(p => ({ id: p.id, status: p.status })));
+
+    res.json(positions);
+  } catch (error) {
+    console.error('[DEFI POSITIONS GET ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Системный endpoint для сохранения позиций (без аутентификации)
+app.post('/api/defi-positions/system', async (req, res) => {
+  try {
+    console.log('[DEFI POSITIONS SYSTEM SAVE] Endpoint called');
+    const { positions } = req.body;
+
+    // Удаляем ВСЕ существующие позиции (системные данные для всех пользователей)
+    await prisma.defiPosition.deleteMany({});
+
+    // Ограничиваем количество активных позиций до 5
+    const activePositions = positions.filter(p => p.status === 'farming' || p.status === 'FARMING').slice(0, 5);
+    const closedPositions = positions.filter(p => p.status === 'unstaked' || p.status === 'UNSTAKED');
+    
+    // Объединяем активные (максимум 5) и закрытые позиции
+    const finalPositions = [...activePositions, ...closedPositions];
+
+    // Создаем новые позиции
+    console.log('[DEFI POSITIONS SYSTEM SAVE] Creating positions with userId = 1');
+    const createdPositions = await Promise.all(
+      finalPositions.map(position => 
+        prisma.defiPosition.create({
+          data: {
+            userId: 1, // Принудительно устанавливаем userId = 1
+            poolId: position.poolId,
+            symbol: position.symbol,
+            project: position.project,
+            chain: position.chain,
+            entryApy: position.entryApy,
+            currentApy: position.currentApy,
+            entryTvl: position.entryTvl,
+            currentTvl: position.currentTvl,
+            status: position.status === 'farming' || position.status === 'FARMING' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
+            entryDate: new Date(position.entryDate),
+            exitDate: position.exitDate ? new Date(position.exitDate) : null,
+            exitReason: position.exitReason
+          }
+        })
+      )
+    );
+
+    console.log('[DEFI POSITIONS SYSTEM SAVE] Saved', createdPositions.length, 'positions (', activePositions.length, 'active,', closedPositions.length, 'closed)');
+    console.log('[DEFI POSITIONS SYSTEM SAVE] First position userId:', createdPositions[0]?.userId);
+    res.json(createdPositions);
+  } catch (error) {
+    console.error('[DEFI POSITIONS SYSTEM SAVE ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
   try {
+    console.log('[DEFI POSITIONS USER SAVE] Endpoint called for userId:', req.params.userId);
     const { userId } = req.params;
     const { positions } = req.body;
     
@@ -1820,6 +2026,37 @@ app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
   }
 }); 
 
+// Системный endpoint для обновления активных позиций (без аутентификации)
+app.put('/api/defi-positions/system/update', async (req, res) => {
+  try {
+    const { positions, isBackgroundUpdate = false } = req.body;
+
+    // Update only active positions (farming status)
+    const updatedPositions = await Promise.all(
+      positions.map(position => 
+        prisma.defiPosition.updateMany({
+          where: { 
+            userId: 1, // Системный пользователь
+            poolId: position.poolId,
+            status: PositionStatus.FARMING
+          },
+          data: {
+            currentApy: position.currentApy,
+            currentTvl: position.currentTvl,
+            updatedAt: new Date()
+          }
+        })
+      )
+    );
+
+    console.log(`[DEFI POSITIONS SYSTEM UPDATE] Updated ${updatedPositions.length} positions (background: ${isBackgroundUpdate})`);
+    res.json({ success: true, updated: updatedPositions.length, isBackgroundUpdate });
+  } catch (error) {
+    console.error('[DEFI POSITIONS SYSTEM UPDATE ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update only active positions (for data updates without changing history)
 app.put('/api/defi-positions/:userId/update', authenticateToken, async (req, res) => {
   try {
@@ -1852,6 +2089,61 @@ app.put('/api/defi-positions/:userId/update', authenticateToken, async (req, res
     res.json({ success: true, updated: updatedPositions.length });
   } catch (error) {
     console.error('[DEFI POSITIONS UPDATE ERROR]', error);
+    res.status(500).json({ error: error.message });
+  }
+}); 
+
+// Clean up excess active positions (keep only 5 most recent)
+app.post('/api/defi-positions/cleanup', authenticateToken, async (req, res) => {
+  try {
+    console.log('[DEFI POSITIONS CLEANUP] Starting cleanup...');
+    
+    // Get all active positions
+    const activePositions = await prisma.defiPosition.findMany({
+      where: { status: 'FARMING' },
+      orderBy: { entryDate: 'desc' }
+    });
+    
+    console.log('[DEFI POSITIONS CLEANUP] Found active positions:', activePositions.length);
+    
+    if (activePositions.length > 5) {
+      // Keep only 5 most recent positions
+      const positionsToKeep = activePositions.slice(0, 5);
+      const positionsToClose = activePositions.slice(5);
+      
+      console.log('[DEFI POSITIONS CLEANUP] Keeping positions:', positionsToKeep.map(p => p.id));
+      console.log('[DEFI POSITIONS CLEANUP] Closing positions:', positionsToClose.map(p => p.id));
+      
+      // Close excess positions
+      for (const position of positionsToClose) {
+        await prisma.defiPosition.update({
+          where: { id: position.id },
+          data: {
+            status: 'UNSTAKED',
+            exitDate: new Date(),
+            exitReason: 'System cleanup - excess positions removed'
+          }
+        });
+      }
+      
+      console.log('[DEFI POSITIONS CLEANUP] Cleanup completed');
+      res.json({ 
+        success: true, 
+        message: `Closed ${positionsToClose.length} excess positions`,
+        kept: positionsToKeep.length,
+        closed: positionsToClose.length
+      });
+    } else {
+      console.log('[DEFI POSITIONS CLEANUP] No cleanup needed');
+      res.json({ 
+        success: true, 
+        message: 'No cleanup needed',
+        kept: activePositions.length,
+        closed: 0
+      });
+    }
+  } catch (error) {
+    console.error('[DEFI POSITIONS CLEANUP ERROR]', error);
     res.status(500).json({ error: error.message });
   }
 }); 

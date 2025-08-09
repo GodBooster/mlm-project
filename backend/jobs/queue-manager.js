@@ -18,7 +18,8 @@ export const JOB_TYPES = {
   REFERRAL_BONUS: 'referral-bonus',
   RANK_BONUS: 'rank-bonus',
   RANK_REWARD: 'rank-reward',
-  BONUS: 'bonus'
+  BONUS: 'bonus',
+  INVESTMENT: 'investment'
 }
 
 // Queue manager class
@@ -128,6 +129,19 @@ class QueueManager {
       }
     })
     console.log('[QUEUE] Handler registered for:', JOB_TYPES.BONUS)
+
+    // Investment handler
+    await this.boss.work(JOB_TYPES.INVESTMENT, async (job) => {
+      try {
+        console.log('[QUEUE] Processing investment job:', job.data)
+        await this.processInvestment(job.data)
+        return { success: true }
+      } catch (error) {
+        console.error('[QUEUE] Investment job failed:', error)
+        throw error
+      }
+    })
+    console.log('[QUEUE] Handler registered for:', JOB_TYPES.INVESTMENT)
   }
 
   // Publish jobs
@@ -199,6 +213,15 @@ class QueueManager {
       userId,
       amount,
       reason
+    })
+  }
+
+  async publishInvestment(userId, packageId, amount) {
+    console.log('[QUEUE] Publishing investment job:', { userId, packageId, amount })
+    return await this.boss.publish(JOB_TYPES.INVESTMENT, {
+      userId,
+      packageId,
+      amount
     })
   }
 
@@ -412,6 +435,25 @@ class QueueManager {
     })
 
     console.log(`Bonus ${amount} processed for user ${userId}: ${reason}`)
+  }
+
+  async processInvestment(data) {
+    const { userId, packageId, amount } = data
+    console.log(`[QUEUE] Processing investment: User ${userId}, Package ${packageId}, Amount ${amount}`)
+    
+    try {
+      // Импортируем investment service
+      const { default: investmentService } = await import('../services/investment-service.js')
+      
+      // Создаем инвестицию
+      const investment = await investmentService.createInvestment(userId, packageId, amount)
+      
+      console.log(`[QUEUE] Investment created successfully: ID ${investment.id}`)
+      return investment
+    } catch (error) {
+      console.error(`[QUEUE] Failed to process investment for user ${userId}:`, error)
+      throw error
+    }
   }
 }
 

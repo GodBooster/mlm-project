@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, User, Mail, Key, Users, Check } from 'lucide-react';
+import ToastContainer from './components/ToastContainer';
+import { useToast } from './hooks/useToast';
 
 export default function LoginPage({ onLogin, onRegister, authError }) {
+  const { toasts, removeToast, showError, showSuccess } = useToast();
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -53,7 +56,7 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!agreedToTerms) {
-      alert('Please agree to the Terms of Service');
+      showError('Please agree to the Terms of Service');
       return;
     }
     
@@ -68,10 +71,10 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
       if (res.ok) {
         setShowVerificationModal(true);
       } else {
-        alert(data.error || 'Registration failed');
+        showError(data.error || 'Registration failed');
       }
     } catch (error) {
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     }
     setLoading(false);
   };
@@ -92,7 +95,14 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
       const data = await res.json();
       if (res.ok) {
         setShowVerificationModal(false);
-        onRegister(registerForm);
+        // После успешной верификации переключаемся на форму логина
+        setIsLogin(true);
+        // Заполняем email в форме логина
+        setLoginForm({ email: registerForm.email, password: '' });
+        // Очищаем форму регистрации
+        setRegisterForm({ name: '', email: '', password: '', referralId: '' });
+        // Показываем сообщение об успешной регистрации
+        showSuccess('Registration successful! Please login with your credentials.');
       } else {
         setVerificationError(data.error || 'Invalid verification code');
       }
@@ -339,6 +349,9 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
           </div>
         </div>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 } 

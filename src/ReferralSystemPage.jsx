@@ -127,7 +127,7 @@ function getReferralCommissions(tree, userId) {
   return {commissions, activeDirects};
 }
 
-export default function ReferralSystemPage({ userData, referralTree, referralLink, packages, transactions, sponsor, currentRank }) {
+export default function ReferralSystemPage({ userData, referralTree, referralLink, packages, transactions, sponsor, currentRank, sponsorAvatar, loadSponsorAvatar, userAvatar, loadUserAvatar }) {
   const [openLinesTournover, setOpenLinesTournover] = useState(0);
   const [actualRank, setActualRank] = useState(1);
   const [nextRankData, setNextRankData] = useState(null);
@@ -183,6 +183,32 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
     
     fetchRankData();
   }, []);
+
+  // Автоматическая загрузка аватара пользователя через 30 секунд после загрузки страницы
+  useEffect(() => {
+    let avatarTimeoutId;
+    if (loadUserAvatar && userData) {
+      console.log('ReferralSystemPage: Scheduling user avatar load in 30 seconds...');
+      avatarTimeoutId = setTimeout(() => {
+        console.log('ReferralSystemPage: Auto-loading user avatar after 30 seconds');
+        loadUserAvatar();
+      }, 30000); // 30 секунд
+    }
+    return () => clearTimeout(avatarTimeoutId);
+  }, [loadUserAvatar, userData]);
+
+  // Автоматическая загрузка аватара спонсора через 35 секунд после загрузки страницы
+  useEffect(() => {
+    let sponsorAvatarTimeoutId;
+    if (loadSponsorAvatar && sponsor && sponsor.id) {
+      console.log('ReferralSystemPage: Scheduling sponsor avatar load in 35 seconds...');
+      sponsorAvatarTimeoutId = setTimeout(() => {
+        console.log('ReferralSystemPage: Auto-loading sponsor avatar after 35 seconds');
+        loadSponsorAvatar(sponsor.id);
+      }, 35000); // 35 секунд
+    }
+    return () => clearTimeout(sponsorAvatarTimeoutId);
+  }, [loadSponsorAvatar, sponsor]);
 
   const directReferrals = getDirectReferrals(referralTree);
   const totalTeam = getTotalTeam(referralTree);
@@ -263,8 +289,31 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
         {sponsor ? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center text-xl text-white">
-                {sponsor.username?.[0] || 'S'}
+              <div className="relative flex-shrink-0">
+                {sponsorAvatar ? (
+                  <img 
+                    src={sponsorAvatar} 
+                    alt="Sponsor Avatar" 
+                    className="w-12 h-12 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div 
+                    className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center text-xl text-white cursor-pointer hover:bg-gray-600 transition-colors"
+                    onClick={() => {
+                      console.log('Sponsor avatar clicked, loading...');
+                      if (loadSponsorAvatar && sponsor.id) {
+                        loadSponsorAvatar(sponsor.id);
+                      }
+                    }}
+                    title="Click to load sponsor avatar"
+                  >
+                    {sponsorAvatar === null ? (
+                      <span>{sponsor.username?.[0] || 'S'}</span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">No Avatar</span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex flex-col">
                 <div className="text-white">{sponsor.username}</div>
@@ -277,34 +326,47 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
       {/* 4.4 Your profile */}
       <Card>
         <div className="text-2xl font-bold text-white mb-4">Your profile</div>
-        <div className="mb-4 flex items-center gap-4">
-          <div className="relative">
-            {userData.avatar ? (
+        <div className="mb-4 flex items-center gap-3 sm:gap-4">
+          <div className="relative flex-shrink-0">
+            {userAvatar ? (
               <img 
-                src={userData.avatar} 
+                src={userAvatar} 
                 alt="Avatar" 
-                className="w-16 h-16 rounded-xl object-cover"
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover"
               />
             ) : (
-              <div className="w-16 h-16 rounded-xl bg-gray-700 flex items-center justify-center text-2xl text-white">
-                {userData.username?.[0] || userData.name?.[0] || 'U'}
+              <div 
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gray-700 flex items-center justify-center text-xl sm:text-2xl text-white cursor-pointer hover:bg-gray-600 transition-colors"
+                onClick={() => {
+                  console.log('User avatar clicked in Statistics, loading...');
+                  if (loadUserAvatar) {
+                    loadUserAvatar();
+                  }
+                }}
+                title="Click to load avatar"
+              >
+                                    {userAvatar === null ? (
+                      <span>{userData.username?.[0] || userData.name?.[0] || 'U'}</span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">No Avatar</span>
+                    )}
               </div>
             )}
           </div>
-          <div className="flex-1">
-            <div className="text-lg font-semibold text-white">{userData.username || userData.name}</div>
-            <div className="text-gray-400 text-sm">{userData.email}</div>
-            <div className="text-orange-400 text-sm">
+          <div className="flex-1 min-w-0">
+            <div className="text-base sm:text-lg font-semibold text-white truncate">{userData.username || userData.name}</div>
+            <div className="text-gray-400 text-xs sm:text-sm truncate">{userData.email}</div>
+            <div className="text-orange-400 text-xs sm:text-sm">
               {actualRank === 0 ? 'No rank' : `Rank ${actualRank}`}
             </div>
           </div>
         </div>
         <div className="space-y-3">
           <div>
-            <div className="text-[rgb(249,115,22)] text-sm mb-1">Referral link</div>
+            <div className="text-[rgb(249,115,22)] text-xs sm:text-sm mb-1">Referral link</div>
             <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg p-2">
-              <span className="text-gray-300 text-sm flex-1 truncate">{referralLink}</span>
-              <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
+              <span className="text-gray-300 text-xs sm:text-sm flex-1 truncate">{referralLink}</span>
+              <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs flex-shrink-0" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
             </div>
           </div>
         </div>

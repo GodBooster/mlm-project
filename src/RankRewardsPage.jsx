@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { HelpCircle, Trophy, Gift } from 'lucide-react';
+import ToastContainer from './components/ToastContainer';
+import { useToast } from './hooks/useToast';
 
 const Card = ({ children, className = "" }) => (
   <div className={`glass-card glass-card-hover p-6 animate-fade-in-up ${className}`}>{children}</div>
@@ -20,6 +22,7 @@ const Modal = ({ onClose, children }) => (
 );
 
 export default function RankRewardsPage({ onRankUpdate }) {
+  const { toasts, removeToast, showSuccess, showError } = useToast();
   const [rankData, setRankData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -87,11 +90,11 @@ export default function RankRewardsPage({ onRankUpdate }) {
         await fetchRankData();
       } else {
         const errorData = await res.json();
-        alert(errorData.error || 'Failed to claim reward');
+        showError(errorData.error || 'Failed to claim reward');
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
-      alert('Failed to claim reward');
+      showError('Failed to claim reward');
     }
     setClaiming(false);
   };
@@ -117,9 +120,12 @@ export default function RankRewardsPage({ onRankUpdate }) {
   return (
     <div className="space-y-4 px-2 sm:px-4">
       <Card>
-        <div className="flex items-center gap-3 mb-4">
-          <Trophy className="text-orange-400 w-6 h-6" />
-          <h3 className="text-xl font-semibold text-white">Rank Rewards System</h3>
+        <div className="mb-4">
+          <div className="flex items-center gap-3 mb-1">
+            <Trophy className="text-orange-400 w-6 h-6" />
+            <h3 className="text-2xl font-bold text-white">Rank Rewards System</h3>
+          </div>
+          <p className="text-gray-300 opacity-70 text-sm">View your rank progress and available rewards</p>
         </div>
         
         <div className="text-gray-300 mb-6 text-xs sm:text-sm">
@@ -167,13 +173,13 @@ export default function RankRewardsPage({ onRankUpdate }) {
         {/* Ranks Table */}
         <div className="overflow-x-auto max-h-[600px]">
           <table className="w-full text-xs sm:text-sm">
-            <thead className="sticky top-0 bg-gray-900/80">
-              <tr className="text-gray-400 border-b border-gray-700">
-                <th className="text-left py-3 px-3">Rank</th>
-                <th className="text-left py-3 px-3">Turnover</th>
-                <th className="text-left py-3 px-3">Cash Reward</th>
-                <th className="text-left py-3 px-3">Special Prize</th>
-                <th className="text-left py-3 px-3">Status</th>
+            <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+              <tr>
+                <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Rank</th>
+                <th className="text-left py-3 px-3 font-semibold text-white uppercase">Turnover</th>
+                <th className="text-left py-3 px-3 font-semibold text-white uppercase">Cash Reward</th>
+                <th className="text-left py-3 px-3 font-semibold text-white uppercase">Special Prize</th>
+                <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tr-lg">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -312,6 +318,9 @@ export default function RankRewardsPage({ onRankUpdate }) {
           </div>
         </Modal>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 } 
