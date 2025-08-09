@@ -763,19 +763,65 @@ app.post('/api/deposit/generate-address', authenticateToken, async (req, res) =>
     console.log(`[DEPOSIT] Generating address for user ${userId}, network: ${network}, order_id: ${orderId}`)
     
     // Call merchant API
-    const merchantResponse = await fetch('https://telegabot.cyberflow.space/api/cabina_transfer-address', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer @!HG~9Ln#6re777GVDF+daf*9Y7e9(;y'
-      },
-      body: JSON.stringify({
-        order_id: orderId,
-        network: network
-      })
-    })
+    const requestBody = {
+      order_id: orderId,
+      network: network,
+      token: '@!HG~9Ln#6re777GVDF+daf*9Y7e9(;y'
+    }
     
-    const merchantData = await merchantResponse.json()
+    console.log(`[DEPOSIT] Request body:`, requestBody)
+    
+    // Try different URL variants to find the correct one
+    const apiUrls = [
+      'https://telegabot.cyberflow.space/api/cabina_transfer_address',
+      'https://telegabot.cyberflow.space/api/cabina-transfer-address', 
+      'https://telegabot.cyberflow.space/cabina_transfer_address',
+      'https://telegabot.cyberflow.space/cabina-transfer-address'
+    ];
+    
+    let merchantResponse = null;
+    let lastError = null;
+    
+    for (const url of apiUrls) {
+      console.log(`[DEPOSIT] Trying URL: ${url}`);
+      try {
+        merchantResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        console.log(`[DEPOSIT] Response status for ${url}: ${merchantResponse.status}`);
+        
+        if (merchantResponse.status !== 404) {
+          console.log(`[DEPOSIT] Found working URL: ${url}`);
+          break;
+        }
+      } catch (error) {
+        console.log(`[DEPOSIT] Error with URL ${url}:`, error.message);
+        lastError = error;
+      }
+    }
+    
+    if (!merchantResponse || merchantResponse.status === 404) {
+      console.error('[DEPOSIT] All API URLs failed with 404');
+      return res.status(400).json({ error: 'Payment gateway API not found' });
+    }
+    
+    console.log(`[DEPOSIT] Merchant response status: ${merchantResponse.status}`)
+    console.log(`[DEPOSIT] Merchant response headers:`, Object.fromEntries(merchantResponse.headers.entries()))
+    
+    let merchantData
+    try {
+      const responseText = await merchantResponse.text()
+      console.log(`[DEPOSIT] Raw response:`, responseText)
+      merchantData = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('[DEPOSIT] Failed to parse JSON response:', parseError.message)
+      return res.status(400).json({ error: 'Invalid response from payment gateway' })
+    }
     
     if (!merchantResponse.ok) {
       console.error('[DEPOSIT] Merchant API error:', merchantData)

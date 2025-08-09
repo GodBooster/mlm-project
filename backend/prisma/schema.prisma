@@ -89,6 +89,8 @@ model DefiPosition {
   currentApy Float
   entryTvl   Float
   currentTvl Float
+  exitApy    Float?
+  exitTvl    Float?
   status     PositionStatus
   entryDate  DateTime
   exitDate   DateTime?

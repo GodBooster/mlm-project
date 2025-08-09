@@ -197,6 +197,8 @@ async fetchPools() {
           ...position,
           status: 'UNSTAKED',
           exitDate: new Date(),
+          exitApy: position.currentApy,    // ✅ Фиксируем последний известный APR
+          exitTvl: position.currentTvl,    // ✅ Фиксируем последний известный TVL
           exitReason: 'Pool removed'
         });
         return null;
@@ -214,6 +216,8 @@ async fetchPools() {
           ...position,
           status: 'UNSTAKED',
           exitDate: new Date(),
+          exitApy: updatedPool.apy,        // ✅ Фиксируем Exit APR
+          exitTvl: updatedPool.tvlUsd,     // ✅ Фиксируем Exit TVL
           exitReason: monthlyAPR < CONFIG.EXIT_MONTHLY_APR 
             ? `APR dropped to ${monthlyAPR.toFixed(1)}%/month` 
             : `TVL dropped to ${updatedPool.tvlUsd.toLocaleString()}`
@@ -285,6 +289,8 @@ async fetchPools() {
           data: {
             status: PositionStatus.UNSTAKED,
             exitDate: position.exitDate,
+            exitApy: position.exitApy,      // ✅ Сохраняем Exit APR
+            exitTvl: position.exitTvl,      // ✅ Сохраняем Exit TVL
             exitReason: position.exitReason,
             updatedAt: new Date()
           }

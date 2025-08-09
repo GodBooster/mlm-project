@@ -107,6 +107,7 @@ const ReportPage = ({ userData }) => {
   };
 
   const formatNumber = (num) => {
+    if (num === null || num === undefined || isNaN(num)) return '--';
     if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
     if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
     if (num >= 1e3) return `$${(num / 1e3).toFixed(2)}K`;
@@ -844,10 +845,10 @@ const ReportPage = ({ userData }) => {
                              {position.exitReason}
                            </div>
                            <div className="text-gray-400 text-xs">
-                             Exit APR: {position.currentApy?.toFixed(1) || '--'}%
+                             Exit APR: {position.exitApy?.toFixed(1) || '--'}%
                            </div>
                            <div className="text-gray-400 text-xs">
-                             Exit TVL: {formatNumber(position.currentTvl)}
+                             Exit TVL: {formatNumber(position.exitTvl)}
                            </div>
                          </td>
                          <td className="py-4 px-4">
@@ -916,10 +917,10 @@ const ReportPage = ({ userData }) => {
                                <div>
                                  <div className="text-gray-400 text-xs uppercase tracking-wide">Exit APR</div>
                                  <div className="text-gray-300 font-semibold text-lg">
-                                   {position.currentApy?.toFixed(1) || '--'}%
+                                   {position.exitApy?.toFixed(1) || '--'}%
                                  </div>
                                  <div className="text-gray-500 text-xs">
-                                   TVL: {formatNumber(position.currentTvl)}
+                                   TVL: {formatNumber(position.exitTvl)}
                                  </div>
                                </div>
                              </div>

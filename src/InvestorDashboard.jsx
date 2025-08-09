@@ -54,9 +54,6 @@ const InvestorDashboard = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('');
-  const [depositLoading, setDepositLoading] = useState(false);
   const [userAvatar, setUserAvatar] = useState(null); // Отдельное состояние для аватара
   const [sponsorAvatar, setSponsorAvatar] = useState(null); // Состояние для аватара спонсора
 
@@ -992,7 +989,7 @@ const InvestorDashboard = () => {
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4">
-                        <button onClick={() => setDepositOpen(true)} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
+                        <button onClick={openDepositModal} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
                         <button onClick={() => setWithdrawOpen(true)} className="flex-1 inactive-button text-white py-2 px-4 rounded-lg">Withdraw</button>
                       </div>
                     </div>
@@ -1158,7 +1155,7 @@ const InvestorDashboard = () => {
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <button onClick={() => setDepositOpen(true)} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
+                    <button onClick={openDepositModal} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
                     <button onClick={() => setWithdrawOpen(true)} className="inactive-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Withdraw</button>
                   </div>
                 </Card>
@@ -1479,31 +1476,7 @@ const InvestorDashboard = () => {
         </div>
       )}
 
-      {/* Deposit Modal (современный, как в дашборде) */}
-      {depositOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDepositOpen(false)}>
-          <div className="bg-gray-900 rounded-2xl shadow-lg p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
-            <button className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold" onClick={() => setDepositOpen(false)} aria-label="Close">×</button>
-            <h3 className="text-2xl font-bold text-white mb-4 text-center">Deposit Funds</h3>
-            <input
-              type="number"
-              min={1}
-              value={depositAmount}
-              onChange={e => setDepositAmount(e.target.value)}
-              className="w-full glass-input px-4 py-3 text-white focus:outline-none mb-4"
-              placeholder="Enter deposit amount"
-              disabled={depositLoading}
-            />
-            <button
-              onClick={handleModalDeposit}
-              className="w-full orange-button text-white py-3 rounded-lg mt-2 disabled:opacity-50"
-              disabled={depositLoading}
-            >
-              {depositLoading ? 'Processing...' : 'Deposit'}
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Withdraw Modal (унифицированный) */}
       <WithdrawModal
