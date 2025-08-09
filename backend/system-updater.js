@@ -99,7 +99,8 @@ class SystemUpdater {
     }
   }
 
-  async fetchPools() {
+  //Для LocalHost
+  /*async fetchPools() {
     try {
       const response = await fetch(CONFIG.API_URL);
       if (!response.ok) throw new Error('API unavailable');
@@ -111,6 +112,33 @@ class SystemUpdater {
       return [];
     }
   }
+*/
+
+async fetchPools() {
+  try {
+    // Принудительно использовать IPv4
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд
+    
+    const response = await fetch(CONFIG.API_URL, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'MLM-Backend/1.0'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    
+    const data = await response.json();
+    console.log(`✅ Fetched ${data.data?.length || 0} pools from API`);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching pools:', error.message);
+    return [];
+  }
+}
 
   async getCurrentPositions() {
     try {

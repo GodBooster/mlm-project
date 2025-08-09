@@ -28,6 +28,8 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
       const code = match[1];
       setReferralCode(code);
       setRegisterForm(prev => ({ ...prev, referralId: code }));
+      // ✅ Переключаем на форму регистрации при наличии реферального кода
+      setIsLogin(false);
     }
   }, []);
 
@@ -202,12 +204,17 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
                 </div>
               </div>
               <div>
-                <label className="block text-gray-400 text-sm mb-2">Referral ID (Optional)</label>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Referral ID (Optional)
+                  {referralCode && (
+                    <span className="text-green-400 text-xs ml-2">✓ Auto-filled from invite link</span>
+                  )}
+                </label>
                 <div className="relative">
                   <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input 
                     type="text" 
-                    className="w-full glass-input pl-10 pr-4 py-3 text-white focus:outline-none" 
+                    className={`w-full glass-input pl-10 pr-4 py-3 text-white focus:outline-none ${referralCode ? 'border-green-500/50 bg-green-500/10' : ''}`}
                     placeholder="Enter referral code or leave empty" 
                     value={registerForm.referralId} 
                     onChange={e => setRegisterForm(f => ({ ...f, referralId: e.target.value }))} 

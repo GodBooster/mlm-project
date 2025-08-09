@@ -420,6 +420,9 @@ app.post('/api/register', async (req, res) => {
     // Generate unique token for link
     const verificationToken = crypto.randomBytes(32).toString('hex');
     
+    // ✅ Логирование кода регистрации
+    console.log(`[REGISTRATION] Email: ${email} | Verification Code: ${verificationCode} | Token: ${verificationToken}`);
+    
     // Store verification code and token temporarily (in production, use Redis or database)
     if (!global.verificationCodes) global.verificationCodes = new Map()
     global.verificationCodes.set(email, {
@@ -431,6 +434,9 @@ app.post('/api/register', async (req, res) => {
 
     // Use new email service
     await emailService.sendVerificationEmail(email, verificationCode, verificationToken)
+    
+    // ✅ Подтверждение успешной отправки
+    console.log(`[REGISTRATION] Verification email sent successfully to ${email}`);
 
     res.json({ success: true, message: 'Verification code and link sent to your email' })
   } catch (error) {
