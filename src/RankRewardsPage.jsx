@@ -171,9 +171,9 @@ export default function RankRewardsPage({ onRankUpdate }) {
         )}
 
         {/* Ranks Table */}
-        <div className="overflow-x-auto max-h-[600px]">
+        <div className="overflow-x-auto">
           <table className="w-full text-xs sm:text-sm">
-            <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+            <thead className="bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
               <tr>
                 <th className="text-left py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Rank</th>
                 <th className="text-left py-3 px-3 font-semibold text-white uppercase">Turnover</th>
