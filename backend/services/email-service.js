@@ -81,42 +81,295 @@ class EmailService {
 
 
   async sendVerificationEmail(to, code, token) {
-    const verifyUrl = `https://margine-space.com/verify?token=${token}`;
+    // Use localhost for development, production URL for production
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
+    const verifyUrl = `${baseUrl}/verify?token=${token}`;
     const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Email Verification</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Margine Space - Email Verification</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { padding: 30px; background: #f8f9fa; }
-            .code { font-size: 32px; font-weight: bold; color: #007bff; text-align: center; padding: 20px; background: white; border-radius: 5px; margin: 20px 0; border: 2px dashed #007bff; }
-            .button { display: inline-block; padding: 12px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; padding: 20px; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+                background-color: #f5f5f5;
+                color: #333333;
+                line-height: 1.6;
+                padding: 20px;
+                margin: 0;
+            }
+            
+            .email-wrapper {
+                max-width: 600px;
+                margin: 0 auto;
+                background-color: #ffffff;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                border: 1px solid #e0e0e0;
+            }
+            
+            .header {
+                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #f97316 100%);
+                padding: 40px 30px;
+                text-align: center;
+                color: #ffffff;
+                position: relative;
+            }
+            
+            .header::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: linear-gradient(90deg, #f97316, #ea580c, #dc2626);
+            }
+            
+            .logo {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+                border-radius: 16px;
+                margin: 0 auto 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 2px solid rgba(255,255,255,0.3);
+                box-shadow: 0 4px 15px rgba(249,115,22,0.4);
+            }
+            
+            .logo::before {
+                content: '';
+                width: 32px;
+                height: 32px;
+                background: #000000;
+                border-radius: 4px;
+            }
+            
+            .header h1 {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 8px;
+                color: #ffffff;
+            }
+            
+            .header p {
+                color: rgba(255,255,255,0.9);
+                font-size: 16px;
+            }
+            
+            .content {
+                padding: 40px 30px;
+                background-color: #ffffff;
+                color: #333333;
+            }
+            
+            .welcome-text {
+                font-size: 18px;
+                color: #333333;
+                text-align: center;
+                margin-bottom: 30px;
+                font-weight: 500;
+            }
+            
+            .verification-section {
+                background-color: #f8f9fa;
+                border: 2px solid #f97316;
+                border-radius: 12px;
+                padding: 30px;
+                margin: 30px 0;
+                text-align: center;
+            }
+            
+            .verification-section h2 {
+                color: #f97316;
+                margin-bottom: 16px;
+                font-size: 20px;
+                font-weight: 600;
+            }
+            
+            .verification-section p {
+                color: #666666;
+                margin-bottom: 20px;
+                font-size: 16px;
+            }
+            
+            .verification-code {
+                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                color: #f97316;
+                font-size: 36px;
+                font-weight: 900;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+                letter-spacing: 6px;
+                border: 2px solid #f97316;
+                font-family: 'Courier New', monospace;
+                display: inline-block;
+            }
+            
+            .code-help {
+                color: #888888;
+                font-size: 14px;
+                margin-top: 16px;
+            }
+            
+            .divider {
+                text-align: center;
+                margin: 30px 0;
+                position: relative;
+            }
+            
+            .divider::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background-color: #e0e0e0;
+            }
+            
+            .divider span {
+                background-color: #ffffff;
+                padding: 8px 20px;
+                color: #888888;
+                font-size: 14px;
+                position: relative;
+            }
+            
+            .cta-button {
+                display: inline-block;
+                background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+                color: #ffffff !important;
+                text-decoration: none;
+                padding: 16px 32px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                box-shadow: 0 4px 15px rgba(249,115,22,0.3);
+                transition: all 0.3s ease;
+                border: none;
+            }
+            
+            .cta-button:hover {
+                background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(249,115,22,0.4);
+                color: #ffffff !important;
+                text-decoration: none;
+            }
+            
+            .button-container {
+                text-align: center;
+                margin: 30px 0;
+            }
+            
+            .security-note {
+                background-color: #fff3cd;
+                border: 1px solid #f97316;
+                border-left: 4px solid #f97316;
+                padding: 20px;
+                margin: 30px 0;
+                border-radius: 4px;
+            }
+            
+            .security-note h3 {
+                color: #f97316;
+                font-size: 16px;
+                margin-bottom: 8px;
+                font-weight: 600;
+            }
+            
+            .security-note p {
+                color: #333333;
+                font-size: 14px;
+                margin: 0;
+            }
+            
+            .footer {
+                padding: 30px;
+                text-align: center;
+                background-color: #f8f9fa;
+                border-top: 1px solid #e0e0e0;
+                color: #666666;
+            }
+            
+            .footer p {
+                margin: 8px 0;
+                font-size: 14px;
+            }
+            
+            .footer a {
+                color: #f97316;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            
+            .footer a:hover {
+                text-decoration: underline;
+            }
+            
+            .footer strong {
+                color: #333333;
+            }
+            
+            @media (max-width: 640px) {
+                body { padding: 10px; }
+                .header { padding: 30px 20px; }
+                .content { padding: 30px 20px; }
+                .verification-code { font-size: 28px; padding: 16px; letter-spacing: 4px; }
+                .footer { padding: 20px; }
+            }
         </style>
     </head>
     <body>
-        <div class="container">
+        <div class="email-wrapper">
             <div class="header">
-                <h1>🚀 Margine Space</h1>
-                <h2>Email Verification</h2>
+                <div class="logo"></div>
+                <h1>Margine Space</h1>
+                <p>Investment Platform</p>
             </div>
+            
             <div class="content">
-                <p>Welcome to Margine Space!</p>
-                <p>To complete your registration, please enter the verification code:</p>
-                <div class="code">${code}</div>
-                <p>Or click the button below:</p>
-                <p style="text-align: center;">
-                    <a href="${verifyUrl}" class="button">✅ Verify Email</a>
+                <p class="welcome-text">
+                    Welcome to Margine Space! 🚀<br>
+                    You're just one step away from accessing your investment dashboard.
                 </p>
-                <p><small>The link is valid for 24 hours</small></p>
+                
+                <div class="verification-section">
+                    <h2>Email Verification Required</h2>
+                    <p>Please use the verification code below to complete your registration:</p>
+                    <div class="verification-code">${code}</div>
+                    <p class="code-help">Enter this code in the verification window</p>
+                </div>
+                
+                <div class="divider">
+                    <span>Or click the button below</span>
+                </div>
+                
+                <div class="button-container">
+                    <a href="${verifyUrl}" class="cta-button">
+                        ✨ Verify Email Instantly
+                    </a>
+                </div>
+                
+                <div class="security-note">
+                    <h3>🔒 Security Information</h3>
+                    <p>This verification link expires in <strong>10 minutes</strong> for your security. If you didn't create an account with Margine Space, please ignore this email.</p>
+                </div>
             </div>
+            
             <div class="footer">
-                <p>© 2025 Margine Space. All rights reserved.</p>
-                <p>If you did not register, simply ignore this email.</p>
+                <p><strong>© 2025 Margine Space</strong></p>
+                <p>Professional Investment Platform</p>
+                <p>If you have any questions, contact our support team.</p>
+                <p><a href="mailto:support@margine-space.com">support@margine-space.com</a></p>
             </div>
         </div>
     </body>
@@ -137,39 +390,292 @@ class EmailService {
   }
 
   async sendPasswordResetEmail(to, token) {
-    const resetUrl = `https://margine-space.com/reset-password?token=${token}`;
+    // Use localhost for development, production URL for production  
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
     const html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Password Reset</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Margine Space - Password Reset</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-            .content { padding: 30px; background: #f8f9fa; }
-            .button { display: inline-block; padding: 12px 30px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; padding: 20px; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+                background-color: #f5f5f5;
+                color: #333333;
+                line-height: 1.6;
+                padding: 20px;
+                margin: 0;
+            }
+            
+            .email-wrapper {
+                max-width: 600px;
+                margin: 0 auto;
+                background-color: #ffffff;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                border: 1px solid #e0e0e0;
+            }
+            
+            .header {
+                background: linear-gradient(135deg, #dc2626 0%, #2d2d2d 50%, #f97316 100%);
+                padding: 40px 30px;
+                text-align: center;
+                color: #ffffff;
+                position: relative;
+            }
+            
+            .header::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: linear-gradient(90deg, #dc2626, #f97316, #ea580c);
+            }
+            
+            .logo {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+                border-radius: 16px;
+                margin: 0 auto 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 2px solid rgba(255,255,255,0.3);
+                box-shadow: 0 4px 15px rgba(220,38,38,0.4);
+                font-size: 32px;
+            }
+            
+            .logo::before {
+                content: '🔐';
+            }
+            
+            .header h1 {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 8px;
+                color: #ffffff;
+            }
+            
+            .header p {
+                color: rgba(255,255,255,0.9);
+                font-size: 16px;
+            }
+            
+            .content {
+                padding: 40px 30px;
+                background-color: #ffffff;
+                color: #333333;
+            }
+            
+            .alert-section {
+                background-color: #fef2f2;
+                border: 2px solid #dc2626;
+                border-left: 4px solid #dc2626;
+                border-radius: 12px;
+                padding: 24px;
+                margin: 30px 0;
+                text-align: center;
+            }
+            
+            .alert-section h2 {
+                color: #dc2626;
+                font-size: 22px;
+                margin-bottom: 12px;
+                font-weight: 600;
+            }
+            
+            .alert-section p {
+                color: #333333;
+                font-size: 16px;
+                margin-bottom: 20px;
+            }
+            
+            .reset-info {
+                background-color: #f8f9fa;
+                border: 1px solid #e0e0e0;
+                border-radius: 12px;
+                padding: 30px;
+                margin: 30px 0;
+                text-align: center;
+            }
+            
+            .reset-info h3 {
+                color: #f97316;
+                font-size: 18px;
+                margin-bottom: 16px;
+                font-weight: 600;
+            }
+            
+            .reset-info p {
+                color: #666666;
+                font-size: 16px;
+                margin-bottom: 24px;
+            }
+            
+            .cta-button {
+                display: inline-block;
+                background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+                color: #ffffff !important;
+                text-decoration: none;
+                padding: 18px 36px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                box-shadow: 0 4px 15px rgba(220,38,38,0.3);
+                transition: all 0.3s ease;
+                border: none;
+            }
+            
+            .cta-button:hover {
+                background: linear-gradient(135deg, #b91c1c 0%, #ea580c 100%);
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(220,38,38,0.4);
+                color: #ffffff !important;
+                text-decoration: none;
+            }
+            
+            .button-container {
+                text-align: center;
+                margin: 30px 0;
+            }
+            
+            .timer-section {
+                background-color: #fff7ed;
+                border: 1px solid #f97316;
+                border-radius: 12px;
+                padding: 20px;
+                margin: 30px 0;
+                text-align: center;
+            }
+            
+            .timer-section .timer {
+                color: #f97316;
+                font-size: 24px;
+                font-weight: 700;
+                margin: 10px 0;
+                font-family: 'Courier New', monospace;
+            }
+            
+            .timer-section p {
+                color: #333333;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            
+            .security-warning {
+                background-color: #fef2f2;
+                border: 1px solid #dc2626;
+                border-left: 4px solid #dc2626;
+                padding: 20px;
+                margin: 30px 0;
+                border-radius: 4px;
+            }
+            
+            .security-warning h3 {
+                color: #dc2626;
+                font-size: 16px;
+                margin-bottom: 8px;
+                font-weight: 600;
+            }
+            
+            .security-warning p {
+                color: #333333;
+                font-size: 14px;
+                margin: 8px 0;
+            }
+            
+            .security-warning strong {
+                color: #dc2626;
+            }
+            
+            .footer {
+                padding: 30px;
+                text-align: center;
+                background-color: #f8f9fa;
+                border-top: 1px solid #e0e0e0;
+                color: #666666;
+            }
+            
+            .footer p {
+                margin: 8px 0;
+                font-size: 14px;
+            }
+            
+            .footer a {
+                color: #f97316;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            
+            .footer a:hover {
+                text-decoration: underline;
+            }
+            
+            .footer strong {
+                color: #333333;
+            }
+            
+            @media (max-width: 640px) {
+                body { padding: 10px; }
+                .header { padding: 30px 20px; }
+                .content { padding: 30px 20px; }
+                .cta-button { padding: 16px 28px; font-size: 15px; }
+                .footer { padding: 20px; }
+            }
         </style>
     </head>
     <body>
-        <div class="container">
+        <div class="email-wrapper">
             <div class="header">
-                <h1>🔐 Margine Space</h1>
-                <h2>Password Reset</h2>
+                <div class="logo"></div>
+                <h1>Margine Space</h1>
+                <p>Password Recovery</p>
             </div>
+            
             <div class="content">
-                <p>You have requested to reset your account password.</p>
-                <p>Click the button below to create a new password:</p>
-                <p style="text-align: center;">
-                    <a href="${resetUrl}" class="button">🔑 Reset Password</a>
-                </p>
-                <p><small>The link is valid for 1 hour</small></p>
-                <p>If you did not request a password reset, simply ignore this email.</p>
+                <div class="alert-section">
+                    <h2>🔐 Password Reset Request</h2>
+                    <p>We received a request to reset the password for your Margine Space account.</p>
+                </div>
+                
+                <div class="reset-info">
+                    <h3>Reset Your Password</h3>
+                    <p>Click the button below to set a new password for your account. You'll be redirected to a secure page where you can enter your new password.</p>
+                    
+                    <div class="button-container">
+                        <a href="${resetUrl}" class="cta-button">
+                            🔑 Reset Password Now
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="timer-section">
+                    <p><strong>⏰ Time Remaining</strong></p>
+                    <div class="timer">60 Minutes</div>
+                    <p>This reset link will expire for your security</p>
+                </div>
+                
+                <div class="security-warning">
+                    <h3>🛡️ Security Notice</h3>
+                    <p><strong>Important:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.</p>
+                    <p><strong>For your protection:</strong> No withdrawals will be permitted for 24 hours after password change.</p>
+                    <p><strong>Need help?</strong> Contact our support team if you have any concerns about your account security.</p>
+                </div>
             </div>
+            
             <div class="footer">
-                <p>© 2025 Margine Space. All rights reserved.</p>
+                <p><strong>© 2025 Margine Space</strong></p>
+                <p>Professional Investment Platform</p>
+                <p>If you have questions about account security:</p>
+                <p><a href="mailto:security@margine-space.com">security@margine-space.com</a></p>
             </div>
         </div>
     </body>
@@ -182,10 +688,11 @@ class EmailService {
             html,
             // text: this.htmlToText(html)
         });
-        // Не логируем ничего при успехе
+        // Логируем успешную отправку согласно паттерну
+        console.log(`|mlm-backend  | [EMAIL] MOCK EMAIL TO: ${to} | CODE: ${token}`);
     } catch (e) {
-        // Не выводим ошибку, только MOCK лог
-        console.log(`[EMAIL] MOCK EMAIL TO: ${to} | TOKEN: ${token}`);
+        // При ошибке также логируем согласно паттерну
+        console.log(`|mlm-backend  | [EMAIL] MOCK EMAIL TO: ${to} | CODE: ${token}`);
     }
   }
 

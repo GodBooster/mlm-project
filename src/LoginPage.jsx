@@ -97,14 +97,30 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
       const data = await res.json();
       if (res.ok) {
         setShowVerificationModal(false);
-        // После успешной верификации переключаемся на форму логина
-        setIsLogin(true);
-        // Заполняем email в форме логина
-        setLoginForm({ email: registerForm.email, password: '' });
+        
+        // Check if token is returned (auto-login)
+        if (data.token && data.user) {
+          console.log('Auto-login after email verification');
+          // Set token and user data directly to localStorage
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('currentPage', 'dashboard');
+          showSuccess('Email verified successfully! Welcome to your dashboard!');
+          // Reload page to trigger InvestorDashboard to pick up new auth data
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          // Fallback to manual login
+          setIsLogin(true);
+          // Заполняем email в форме логина
+          setLoginForm({ email: registerForm.email, password: '' });
+          showSuccess('Registration successful! Please login with your credentials.');
+        }
+        
         // Очищаем форму регистрации
         setRegisterForm({ name: '', email: '', password: '', referralId: '' });
-        // Показываем сообщение об успешной регистрации
-        showSuccess('Registration successful! Please login with your credentials.');
+        setVerificationCode('');
       } else {
         setVerificationError(data.error || 'Invalid verification code');
       }

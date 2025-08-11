@@ -420,8 +420,14 @@ app.post('/api/register', async (req, res) => {
     // Generate unique token for link
     const verificationToken = crypto.randomBytes(32).toString('hex');
     
-    // ✅ Логирование кода регистрации
-    console.log(`[REGISTRATION] Email: ${email} | Verification Code: ${verificationCode} | Token: ${verificationToken}`);
+    // ✅ Логирование кода регистрации с URL
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
+    const verifyUrl = `${baseUrl}/verify?token=${verificationToken}`;
+    
+    console.log(`|mlm-backend  | [REGISTRATION] EMAIL: ${email}`);
+    console.log(`|mlm-backend  | [REGISTRATION] CODE: ${verificationCode}`);
+    console.log(`|mlm-backend  | [REGISTRATION] TOKEN: ${verificationToken}`);
+    console.log(`|mlm-backend  | [REGISTRATION] LINK: ${verifyUrl}`);
     
     // Store verification code and token temporarily (in production, use Redis or database)
     if (!global.verificationCodes) global.verificationCodes = new Map()
@@ -436,7 +442,7 @@ app.post('/api/register', async (req, res) => {
     await emailService.sendVerificationEmail(email, verificationCode, verificationToken)
     
     // ✅ Подтверждение успешной отправки
-    console.log(`[REGISTRATION] Verification email sent successfully to ${email}`);
+    console.log(`|mlm-backend  | [REGISTRATION] Email sent successfully to ${email}`);
 
     res.json({ success: true, message: 'Verification code and link sent to your email' })
   } catch (error) {
@@ -493,20 +499,23 @@ app.post('/api/reset-password', async (req, res) => {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    // Generate reset token (simple implementation - in production use proper token generation)
+    // Generate reset token
     const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     
-    // Store reset token in user record (you might want to add a resetToken field to your schema)
+    // ✅ Логирование процесса восстановления пароля согласно паттерну
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
+    const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+    
+    // Store reset token in user record with expiry (1 hour)
     await prisma.user.update({
       where: { id: user.id },
       data: { 
-        // For now, we'll use a simple approach. In production, add resetToken and resetTokenExpiry fields
-        // resetToken: resetToken,
-        // resetTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        passwordResetToken: resetToken,
+        passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000) // 1 hour
       }
     })
 
-    // Use new email service
+    // Use email service to send reset email
     await emailService.sendPasswordResetEmail(email, resetToken)
     
     res.json({ 
@@ -519,27 +528,115 @@ app.post('/api/reset-password', async (req, res) => {
   }
 })
 
+// Verify reset token endpoint
+app.post('/api/verify-reset-token', async (req, res) => {
+  try {
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    // Find user with this reset token
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: {
+          gt: new Date() // Token must not be expired
+        }
+      }
+    })
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired token' })
+    }
+
+    res.json({ success: true, message: 'Token is valid' })
+  } catch (error) {
+    console.error('Verify reset token error:', error)
+    res.status(500).json({ error: 'Failed to verify token' })
+  }
+})
+
+// Reset password confirm endpoint
+app.post('/api/reset-password-confirm', async (req, res) => {
+  try {
+    const { token, password } = req.body
+
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and password are required' })
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' })
+    }
+
+    // Find user with this reset token
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: {
+          gt: new Date() // Token must not be expired
+        }
+      }
+    })
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired token' })
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Update user password and clear reset token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null
+      }
+    })
+
+    res.json({ success: true, message: 'Password has been reset successfully' })
+  } catch (error) {
+    console.error('Reset password confirm error:', error)
+    res.status(500).json({ error: 'Failed to reset password' })
+  }
+})
+
 app.post('/api/verify-email', async (req, res) => {
   try {
     const { email, code } = req.body
+    console.log(`|mlm-backend  | [VERIFY_CODE] Starting code verification for email: ${email}, code: ${code}`);
 
     // Check if verification code exists and is valid
     if (!global.verificationCodes || !global.verificationCodes.has(email)) {
+      console.log(`|mlm-backend  | [VERIFY_CODE] ERROR: No verification code found for email: ${email}`);
       return res.status(400).json({ error: 'Invalid or expired verification code' })
     }
 
     const verificationData = global.verificationCodes.get(email)
+    console.log(`|mlm-backend  | [VERIFY_CODE] Found verification data for ${email}, stored code: ${verificationData.code}`);
     
     // Check if code is expired
-    if (Date.now() > verificationData.expires) {
+    const now = Date.now();
+    const expiresAt = verificationData.expires;
+    console.log(`|mlm-backend  | [VERIFY_CODE] Time check - Now: ${now}, Expires: ${expiresAt}, Valid: ${now <= expiresAt}`);
+    
+    if (now > expiresAt) {
+      console.log(`|mlm-backend  | [VERIFY_CODE] ERROR: Code expired for email: ${email}`);
       global.verificationCodes.delete(email)
       return res.status(400).json({ error: 'Verification code has expired' })
     }
 
     // Check if code matches
     if (verificationData.code !== code) {
+      console.log(`|mlm-backend  | [VERIFY_CODE] ERROR: Code mismatch. Expected: ${verificationData.code}, Received: ${code}`);
       return res.status(400).json({ error: 'Invalid verification code' })
     }
+
+    console.log(`|mlm-backend  | [VERIFY_CODE] Code verification successful for ${email}`);
 
     // Get user data from verification
     const { userData } = verificationData
@@ -601,6 +698,148 @@ app.post('/api/verify-email', async (req, res) => {
     })
   } catch (error) {
     console.error('Email verification error:', error)
+    res.status(500).json({ error: 'Email verification failed' })
+  }
+})
+
+// Verify email by token (for link-based verification)
+app.post('/api/verify-email-token', async (req, res) => {
+  try {
+    const { token } = req.body
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Starting verification for token: ${token?.substring(0, 16)}...`);
+
+    if (!token) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: No token provided`);
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    // Find verification data by token
+    if (!global.verificationCodes) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: No verification codes in memory`);
+      return res.status(400).json({ error: 'Invalid or expired verification token' })
+    }
+
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Searching through ${global.verificationCodes.size} stored codes`);
+
+    let verificationData = null
+    let verificationEmail = null
+
+    // Search through all verification codes to find the matching token
+    for (const [email, data] of global.verificationCodes.entries()) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] Checking email: ${email}, token: ${data.token?.substring(0, 16)}...`);
+      if (data.token === token) {
+        verificationData = data
+        verificationEmail = email
+        console.log(`|mlm-backend  | [VERIFY_TOKEN] FOUND matching token for email: ${email}`);
+        
+        // IMMEDIATELY remove token to prevent concurrent usage
+        global.verificationCodes.delete(email);
+        console.log(`|mlm-backend  | [VERIFY_TOKEN] Token immediately locked/removed to prevent concurrent access`);
+        break
+      }
+    }
+
+    if (!verificationData) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] INFO: Token not found (likely already used by concurrent request)`);
+      // Return success silently - don't show error to frontend
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Email verification already completed',
+        alreadyProcessed: true
+      })
+    }
+
+    // Check if user already exists (prevent double creation)
+    const existingUser = await prisma.user.findUnique({
+      where: { email: verificationEmail }
+    });
+    
+    if (existingUser) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: User already exists for email: ${verificationEmail}`);
+      return res.status(400).json({ error: 'User already registered' });
+    }
+
+    // Check if token is expired
+    const now = Date.now();
+    const expiresAt = verificationData.expires;
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Time check - Now: ${now}, Expires: ${expiresAt}, Valid: ${now <= expiresAt}`);
+    
+    if (now > expiresAt) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: Token expired for email: ${verificationEmail}`);
+      return res.status(400).json({ error: 'Verification token has expired' })
+    }
+
+    // Get user data from verification
+    const { userData } = verificationData
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Processing user data for email: ${userData.email}`);
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(userData.password, 10)
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Password hashed successfully`);
+
+    // Generate referral code
+    const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Generated referral code: ${referralCode}`);
+
+    // Create user
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Creating user in database...`);
+    const user = await prisma.user.create({
+      data: {
+        email: userData.email,
+        username: userData.name,
+        password: hashedPassword,
+        referralCode,
+        referredBy: userData.referralId || null
+      }
+    })
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] User created successfully with ID: ${user.id}`);
+
+    // Process referral if referralId provided
+    if (userData.referralId) {
+      console.log(`|mlm-backend  | [VERIFY_TOKEN] Processing referral for code/ID: ${userData.referralId}`);
+      try {
+        // Find referrer by referral code or ID
+        const referrer = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { referralCode: userData.referralId },
+              { id: parseInt(userData.referralId) || 0 }
+            ]
+          }
+        });
+        
+        if (referrer) {
+          console.log(`|mlm-backend  | [VERIFY_TOKEN] Found referrer: ${referrer.email} (${referrer.referralCode})`);
+          await referralService.processReferral(user.id, referrer.referralCode)
+          console.log(`|mlm-backend  | [VERIFY_TOKEN] Referral processed successfully`);
+        } else {
+          console.log(`|mlm-backend  | [VERIFY_TOKEN] WARNING: Referrer not found for code/ID: ${userData.referralId}`);
+        }
+      } catch (referralError) {
+        console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR processing referral:`, referralError.message);
+      }
+    }
+
+    // Generate JWT token for immediate login
+    const token_jwt = generateToken(user)
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Generated JWT token for auto-login`);
+
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] SUCCESS: Email verification completed for ${user.email}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Email verified successfully',
+      token: token_jwt,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        referralCode: user.referralCode
+      }
+    })
+  } catch (error) {
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] CRITICAL ERROR: ${error.message}`);
+    console.log(`|mlm-backend  | [VERIFY_TOKEN] Error stack:`, error.stack);
     res.status(500).json({ error: 'Email verification failed' })
   }
 })

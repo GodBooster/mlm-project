@@ -21,6 +21,11 @@ const InvestorDashboard = () => {
   // Восстанавливаем currentPage из localStorage, если есть
   const getInitialPage = () => {
     const saved = localStorage.getItem('currentPage');
+    const token = localStorage.getItem('token');
+    // Если есть токен, но нет сохраненной страницы - показываем дашборд
+    if (token && !saved) {
+      return 'dashboard';
+    }
     return saved || 'login';
   };
   const [currentPage, setCurrentPage] = useState(getInitialPage());
@@ -34,7 +39,10 @@ const InvestorDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [transactions, setTransactions] = useState([]);
   const [packages, setPackages] = useState([]);
   const [referralLink, setReferralLink] = useState('');
@@ -224,6 +232,7 @@ const InvestorDashboard = () => {
   const handleLogout = useCallback(() => {
     setToken('');
     localStorage.removeItem('token');
+    localStorage.removeItem('user'); // Очищаем данные пользователя
     setUserData(null);
     setTransactions([]);
     setUserAvatar(null); // Сбрасываем аватар при логауте
@@ -306,6 +315,8 @@ const InvestorDashboard = () => {
       
       // Устанавливаем все данные сразу - как было изначально
       setUserData(profileData);
+      // Сохраняем данные пользователя в localStorage для автологина
+      localStorage.setItem('user', JSON.stringify(profileData));
       setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
       setPackages(Array.isArray(packagesData) ? packagesData : []);
       setReferralLink(referralLinkData.link || '');
@@ -1340,8 +1351,8 @@ const InvestorDashboard = () => {
                           >
                             {isGeneratingAddress ? 'Generating...' : 'Generate New Address'}
                           </button>
-                        </div>
-                      )}
+                    </div>
+                  )}
 
                       <button onClick={closeModal} className="w-full glass-button text-white py-2 rounded-lg">Close</button>
                     </div>
