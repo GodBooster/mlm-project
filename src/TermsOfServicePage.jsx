@@ -1,9 +1,13 @@
 import React from 'react';
 import { ArrowLeft, FileText, Shield, Info, AlertCircle } from 'lucide-react';
 
-export default function TermsOfServicePage() {
+export default function TermsOfServicePage({ onGoBack }) {
   const handleGoBack = () => {
-    window.history.back();
+    if (onGoBack) {
+      onGoBack(); // Используем переданную функцию
+    } else {
+      window.history.back(); // Fallback для обычного использования
+    }
   };
 
   return (

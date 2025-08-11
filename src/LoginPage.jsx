@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, User, Mail, Key, Users, Check } from 'lucide-react';
 import ToastContainer from './components/ToastContainer';
 import { useToast } from './hooks/useToast';
+import TermsOfServicePage from './TermsOfServicePage';
 
 export default function LoginPage({ onLogin, onRegister, authError }) {
   const { toasts, removeToast, showError, showSuccess } = useToast();
@@ -20,6 +21,7 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
   const [verificationError, setVerificationError] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [referralCode, setReferralCode] = useState('');
+  const [showTermsPage, setShowTermsPage] = useState(false);
 
   // Get referral ID from URL on component mount
   useEffect(() => {
@@ -129,6 +131,11 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
     }
     setVerificationLoading(false);
   };
+
+  // Если показываем Terms of Service, рендерим его с кнопкой Back
+  if (showTermsPage) {
+    return <TermsOfServicePage onGoBack={() => setShowTermsPage(false)} />;
+  }
 
   return (
     <div className="min-h-screen glass-bg flex items-center justify-center p-4">
@@ -253,7 +260,7 @@ export default function LoginPage({ onLogin, onRegister, authError }) {
                   I have read and agree to the{' '}
                   <button
                     type="button"
-                    onClick={() => window.open('/terms-of-service', '_blank')}
+                    onClick={() => setShowTermsPage(true)}
                     className="text-orange-400 hover:text-orange-300 underline"
                   >
                     Terms of Service
