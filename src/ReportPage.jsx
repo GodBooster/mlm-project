@@ -773,30 +773,31 @@ const ReportPage = ({ userData }) => {
                <p className="text-gray-300 opacity-70 text-sm">View your closed positions and exit reasons</p>
              </div>
 
-             {/* Desktop Table View */}
-             <div className="hidden sm:block overflow-x-auto">
-               <table className="w-full">
-                 <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
-                   <tr>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase rounded-tl-lg text-xs sm:text-sm">Pool</th>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Chain</th>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Entry APR</th>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Entry TVL</th>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Period</th>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Exit Details</th>
-                     <th className="text-left py-4 px-4 font-semibold text-white uppercase rounded-tr-lg text-xs sm:text-sm">Link</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {closedPositions.length === 0 ? (
-                     <tr>
-                       <td colSpan="7" className="py-12 text-center">
-                         <div className="text-gray-400 text-lg mb-2">No closed positions yet</div>
-                         <div className="text-gray-500 text-sm">History will be displayed here when positions are closed</div>
-                       </td>
-                     </tr>
-                   ) : (
-                     closedPositions.map((position, index) => {
+                         {/* Desktop Table View */}
+            <div className="hidden sm:block">
+              <div className="max-h-96 overflow-y-auto border border-gray-800 rounded-lg">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+                    <tr>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase rounded-tl-lg text-xs sm:text-sm">Pool</th>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Chain</th>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Entry APR</th>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Entry TVL</th>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Period</th>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase text-xs sm:text-sm">Exit Details</th>
+                      <th className="text-left py-4 px-4 font-semibold text-white uppercase rounded-tr-lg text-xs sm:text-sm">Link</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {closedPositions.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="py-12 text-center">
+                          <div className="text-gray-400 text-lg mb-2">No closed positions yet</div>
+                          <div className="text-gray-500 text-sm">History will be displayed here when positions are closed</div>
+                        </td>
+                      </tr>
+                    ) : (
+                      closedPositions.slice(0, 10).map((position, index) => {
                      const entryMonthlyAPR = calculateMonthlyAPR(position.entryApy);
                      const daysDiff = position.exitDate 
                        ? Math.floor((new Date(position.exitDate) - new Date(position.entryDate)) / (1000 * 60 * 60 * 24))
@@ -867,7 +868,8 @@ const ReportPage = ({ userData }) => {
                    }))}
                  </tbody>
                </table>
-             </div>
+              </div>
+            </div>
 
              {/* Mobile Cards View */}
              <div className="sm:hidden">
