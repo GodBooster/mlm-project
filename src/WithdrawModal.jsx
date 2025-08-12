@@ -27,7 +27,7 @@ export default function WithdrawModal({
 
   const validate = () => {
     if (!amount || isNaN(amount) || Number(amount) < minAmount) {
-      return `Enter amount ≥ ${minAmount}`;
+      return `Amount must be at least $${minAmount}`;
     }
     if (Number(amount) > balance) {
       return 'Not enough balance';
@@ -51,8 +51,11 @@ export default function WithdrawModal({
     setError('');
     setLoading(true);
     try {
-      await onWithdraw(Number(amount), wallet.trim());
-      onClose();
+      const result = await onWithdraw(Number(amount), wallet.trim());
+      // Если успешно, закрываем модал
+      if (result && result.success) {
+        onClose();
+      }
     } catch (e) {
       setError(e.message || 'Withdraw failed');
     }
@@ -86,6 +89,7 @@ export default function WithdrawModal({
           ×
         </button>
         <h3 className="text-2xl font-bold text-white mb-4 text-center">Withdraw Funds</h3>
+       
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-orange-400 text-sm mb-1">Your Balance</label>
@@ -102,7 +106,7 @@ export default function WithdrawModal({
               value={amount}
               onChange={e => setAmount(e.target.value)}
               className="w-full glass-input px-4 py-3 text-white focus:outline-none"
-              placeholder={`Enter amount (min $${minAmount})`}
+              placeholder={`Enter amount (minimum $${minAmount})`}
               disabled={loading}
             />
           </div>

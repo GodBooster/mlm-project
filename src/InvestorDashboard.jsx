@@ -63,6 +63,8 @@ const InvestorDashboard = () => {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [userAvatar, setUserAvatar] = useState(null); // Отдельное состояние для аватара
   const [sponsorAvatar, setSponsorAvatar] = useState(null); // Состояние для аватара спонсора
+  const [modalAmount, setModalAmount] = useState(''); // Добавляем недостающую переменную
+
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
@@ -418,7 +420,7 @@ const InvestorDashboard = () => {
   // Автоматическая загрузка аватара спонсора через 35 секунд (чуть позже пользовательского)
   useEffect(() => {
     let sponsorAvatarTimeoutId;
-    if (token && userData && sponsor && !isAuthLoading) {
+    if (token && userData && sponsor && !isAuthLoading && !sponsorAvatar) { // Добавляем проверку !sponsorAvatar
       console.log('Scheduling sponsor avatar load in 35 seconds...');
       sponsorAvatarTimeoutId = setTimeout(() => {
         console.log('Auto-loading sponsor avatar after 35 seconds');
@@ -426,7 +428,7 @@ const InvestorDashboard = () => {
       }, 35000); // 35 секунд
     }
     return () => clearTimeout(sponsorAvatarTimeoutId);
-  }, [token, userData, sponsor, isAuthLoading, loadSponsorAvatar]);
+  }, [token, userData, sponsor, isAuthLoading, loadSponsorAvatar, sponsorAvatar]);
 
   // Сохраняем currentPage в localStorage при изменении
   useEffect(() => {
@@ -466,13 +468,26 @@ const InvestorDashboard = () => {
         setUserData(profileData);
         fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
           .then(res => res.json()).then(setTransactions);
+        
+        // Показываем тост об успехе
+        showSuccess(`Withdrawal of $${amount} processed successfully!`);
+        
+        // Возвращаем успешный результат
+        return { success: true };
       } else {
-        alert(data.error || 'Withdrawal error');
+        // Показываем тост об ошибке
+        showError(data.error || 'Minimum withdrawal amount is $50');
+        
+        // Возвращаем ошибку
+        throw new Error(data.error || 'Withdrawal failed');
       }
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+      showError('Network error occurred during withdrawal');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, showSuccess, showError]);
 
 
 
@@ -544,6 +559,8 @@ const InvestorDashboard = () => {
     setShowInvestmentModal(false);
     setSelectedPackage(null);
   }, []);
+
+
 
   // Investment modal open handler
   const handleOpenInvestmentModal = useCallback((pkg) => {
@@ -884,7 +901,12 @@ const InvestorDashboard = () => {
                         <div className="text-[rgb(249,115,22)] text-xs sm:text-sm mb-1">Referral link</div>
                         <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg p-2">
                           <span className="text-gray-300 text-xs sm:text-sm flex-1 truncate">{referralLink}</span>
-                          <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs flex-shrink-0" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
+                          <button 
+                            className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs flex-shrink-0"
+                            onClick={() => navigator.clipboard.writeText(referralLink)}
+                          >
+                            Copy
+                          </button>
                         </div>
                       </div>
                       

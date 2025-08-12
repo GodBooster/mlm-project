@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Copy } from 'lucide-react';
 
 const Card = ({ children, className = "" }) => (
@@ -216,6 +216,8 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
   
 
   
+
+  
   // Базовые вычисления
   const personalInvested = transactions.filter(t => t.type === 'INVESTMENT').reduce((a, b) => a + b.amount, 0);
   const requiredPersonal = 100;
@@ -366,7 +368,12 @@ export default function ReferralSystemPage({ userData, referralTree, referralLin
             <div className="text-[rgb(249,115,22)] text-xs sm:text-sm mb-1">Referral link</div>
             <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg p-2">
               <span className="text-gray-300 text-xs sm:text-sm flex-1 truncate">{referralLink}</span>
-              <button className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs flex-shrink-0" onClick={() => {navigator.clipboard.writeText(referralLink);}}>Copy</button>
+              <button 
+                className="text-orange-400 hover:text-orange-300 glass-button px-2 py-1 rounded text-xs flex-shrink-0"
+                onClick={() => navigator.clipboard.writeText(referralLink)}
+              >
+                Copy
+              </button>
             </div>
           </div>
         </div>

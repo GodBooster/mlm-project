@@ -100,7 +100,7 @@ const AvatarChangeModal = ({ isOpen, onClose, token, showSuccess, showError, onA
       formData.append('avatar', fileToUpload);
       
       const res = await fetch(`${API}/api/profile/avatar`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`
         },

@@ -375,17 +375,22 @@ class EmailService {
     </body>
     </html>`;
     try {
-        await this.transporter.sendMail({
+        console.log(`[EMAIL] Attempting to send verification email to: ${to}`);
+        const result = await this.transporter.sendMail({
             from: `${process.env.SMTP_FROM_NAME || 'Margine Space'} <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
             to,
             subject: process.env.EMAIL_VERIFICATION_SUBJECT || 'Email Verification',
             html,
             // text: this.htmlToText(html) // убираем text, чтобы не было ReferenceError
         });
-        // Не логируем ничего при успехе
+        console.log(`[EMAIL] ✅ Verification email sent successfully to: ${to} | MessageID: ${result.messageId}`);
+        return result;
     } catch (e) {
-        // Не выводим ошибку, только MOCK лог
+        console.error(`[EMAIL] ❌ Failed to send verification email to: ${to}:`, e.message);
+        console.error(`[EMAIL] ❌ Full error:`, e);
+        // Выводим MOCK лог для совместимости
         console.log(`[EMAIL] MOCK EMAIL TO: ${to} | CODE: ${code}`);
+        throw e; // Пробрасываем ошибку дальше
     }
   }
 
@@ -681,18 +686,24 @@ class EmailService {
     </body>
     </html>`;
     try {
-        await this.transporter.sendMail({
+        console.log(`[EMAIL] Attempting to send password reset email to: ${to}`);
+        const result = await this.transporter.sendMail({
             from: `${process.env.SMTP_FROM_NAME || 'Margine Space'} <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
             to,
             subject: process.env.PASSWORD_RESET_SUBJECT || 'Password Reset',
             html,
             // text: this.htmlToText(html)
         });
+        console.log(`[EMAIL] ✅ Password reset email sent successfully to: ${to} | MessageID: ${result.messageId}`);
         // Логируем успешную отправку согласно паттерну
         console.log(`|mlm-backend  | [EMAIL] MOCK EMAIL TO: ${to} | CODE: ${token}`);
+        return result;
     } catch (e) {
+        console.error(`[EMAIL] ❌ Failed to send password reset email to: ${to}:`, e.message);
+        console.error(`[EMAIL] ❌ Full error:`, e);
         // При ошибке также логируем согласно паттерну
         console.log(`|mlm-backend  | [EMAIL] MOCK EMAIL TO: ${to} | CODE: ${token}`);
+        throw e; // Пробрасываем ошибку дальше
     }
   }
 
@@ -734,5 +745,21 @@ async verifyConnection() {
   }
 }
 }
+
+// Экспортируем функции для использования в очередях
+export const sendEmail = async (to, subject, text, html) => {
+  const emailService = new EmailService();
+  return await emailService.sendEmail(to, subject, html, text);
+};
+
+export const sendVerificationEmail = async (to, code, token) => {
+  const emailService = new EmailService();
+  return await emailService.sendVerificationEmail(to, code, token);
+};
+
+export const sendPasswordResetEmail = async (to, token) => {
+  const emailService = new EmailService();
+  return await emailService.sendPasswordResetEmail(to, token);
+};
 
 export default new EmailService()

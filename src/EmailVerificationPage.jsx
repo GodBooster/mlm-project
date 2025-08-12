@@ -29,41 +29,52 @@ export default function EmailVerificationPage({ onLogin }) {
       }
 
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/verify-email-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+        console.log(`[VERIFY] Attempting to verify token: ${token.substring(0, 20)}...`);
+        const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/verify-email?token=${token}`;
+        console.log(`[VERIFY] Calling URL: ${url}`);
+        
+        const res = await fetch(url, {
+          method: 'GET'
         });
-
-        const data = await res.json();
+        
+        console.log(`[VERIFY] Response status: ${res.status}`);
+        console.log(`[VERIFY] Response ok: ${res.ok}`);
 
         if (res.ok) {
+          const data = await res.json();
           setVerified(true);
           
-          // Check if this was already processed by another request
-          if (data.alreadyProcessed) {
-            showSuccess('Email verification already completed! Please log in manually.');
-            setWillAutoLogin(false);
-            // Don't auto-login since we don't have user data
-          } else {
-            showSuccess('Email verified successfully! You are now logged in.');
+          if (data.token && data.user) {
+            // Автоматический логин
             setWillAutoLogin(true);
+            showSuccess('Email verified successfully! Logging you in automatically...');
             
-            // Auto-login user
-            if (data.token && data.user && onLogin) {
-              setTimeout(() => {
-                onLogin({ 
-                  token: data.token, 
-                  user: data.user 
-                });
-              }, 2000);
+            // Обновляем состояние глобального логина
+            if (onLogin) {
+              onLogin({
+                token: data.token,
+                user: data.user
+              });
             }
+            
+            // Перенаправление будет обработано в App.jsx
+          } else {
+            // Fallback - если токен не получен
+            setWillAutoLogin(false);
+            showSuccess('Email verified successfully! Please log in to continue.');
+            
+            // Redirect to login page after 3 seconds
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 3000);
           }
         } else {
-          setError(data.error || 'Verification failed');
-          showError(data.error || 'Verification failed');
+          const errorData = await res.json().catch(() => ({ error: 'Verification failed' }));
+          setError(errorData.error || 'Verification failed');
+          showError(errorData.error || 'Verification failed');
         }
       } catch (error) {
+        console.error(`[VERIFY] Error occurred:`, error);
         setError('Network error occurred');
         showError('Network error occurred');
       } finally {
@@ -102,12 +113,17 @@ export default function EmailVerificationPage({ onLogin }) {
           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="text-white text-3xl">✓</span>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-4">Email Verified!</h1>
+          <h1 className="text-2xl font-bold text-white mb-4">
+            {willAutoLogin ? 'Email Verified & Logging In!' : 'Email Verified!'}
+          </h1>
           <p className="text-gray-400 mb-6">
-            Your email has been successfully verified.
+            {willAutoLogin 
+              ? 'Your email has been verified. You will be automatically logged in and redirected to your dashboard.'
+              : 'Your email has been successfully verified.'
+            }
           </p>
           <div className="text-sm text-green-400">
-            {willAutoLogin ? 'Redirecting to dashboard...' : 'Please go to login page to continue.'}
+            {willAutoLogin ? 'Logging you in automatically...' : 'Please go to login page to continue.'}
           </div>
           {!willAutoLogin && (
             <button 

@@ -15,11 +15,54 @@ import { authenticateToken, generateToken } from './middleware/auth.js'
 import nodemailer from 'nodemailer'
 import crypto from 'crypto'
 import emailService from './services/email-service.js'
+import queueService from './services/queueService.js'
 import systemUpdater from './system-updater.js'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
+  errorFormat: 'pretty',
+})
+
+// Улучшенная обработка PostgreSQL соединений
+prisma.$connect()
+  .then(() => {
+    console.log('✅ Database connected successfully');
+  })
+  .catch((error) => {
+    console.error('❌ Database connection failed:', error);
+  });
+
+// Обработка разрыва соединения
+prisma.$on('disconnect', () => {
+  console.log('⚠️ Database disconnected');
+});
+
+// В Prisma 5.0.0 beforeExit перенесен в process
+process.on('beforeExit', async () => {
+  console.log('🔄 Closing database connections...');
+  await prisma.$disconnect();
+});
+
+process.on('SIGINT', async () => {
+  console.log('🔄 Received SIGINT, closing database connections...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('🔄 Received SIGTERM, closing database connections...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
 const app = express()
 app.use(express.json());
+
+// Логирование всех запросов
+app.use((req, res, next) => {
+  console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Simple working CORS
 const allowedOrigins = [
@@ -63,6 +106,26 @@ scheduler.start().catch(console.error)
 
 // Start system updater
 systemUpdater.start().catch(console.error)
+
+// Middleware для обработки ошибок Prisma (упрощенная версия)
+app.use((error, req, res, next) => {
+  if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+    console.log('🔄 Database connection lost, attempting to reconnect...');
+    // Попытка переподключения
+    prisma.$connect()
+      .then(() => {
+        console.log('✅ Database reconnected successfully');
+        // Повторяем запрос
+        next();
+      })
+      .catch((reconnectError) => {
+        console.error('❌ Database reconnection failed:', reconnectError);
+        res.status(500).json({ error: 'Database connection error' });
+      });
+  } else {
+    next(error);
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -399,52 +462,114 @@ async function sendVerificationEmail(to, code, token) {
 app.post('/api/register', async (req, res) => {
   try {
     const { email, name, username, password, referralId } = req.body
-    const userName = username || name || email.split('@')[0]; // Use name if provided, otherwise use email prefix
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username: userName }
-        ]
-      }
-    })
-
-    if (existingUser) {
-      return res.status(400).json({ error: 'User with this email or username already exists' })
+    
+    // Проверяем обязательные поля
+    if (!email || email.trim() === '') {
+      return res.status(400).json({ error: 'Email is required' });
     }
+    
+    // Проверяем формат email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+    
+    if (!password || password.trim() === '') {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+    
+    const userName = username || name || (email ? email.split('@')[0] : 'user'); // Use name if provided, otherwise use email prefix
 
-    // Generate verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
-    // Generate unique token for link
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    
-    // ✅ Логирование кода регистрации с URL
-    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
-    const verifyUrl = `${baseUrl}/verify?token=${verificationToken}`;
-    
-    console.log(`|mlm-backend  | [REGISTRATION] EMAIL: ${email}`);
-    console.log(`|mlm-backend  | [REGISTRATION] CODE: ${verificationCode}`);
-    console.log(`|mlm-backend  | [REGISTRATION] TOKEN: ${verificationToken}`);
-    console.log(`|mlm-backend  | [REGISTRATION] LINK: ${verifyUrl}`);
-    
-    // Store verification code and token temporarily (in production, use Redis or database)
-    if (!global.verificationCodes) global.verificationCodes = new Map()
-    global.verificationCodes.set(email, {
-      code: verificationCode,
-      token: verificationToken,
-      expires: Date.now() + 10 * 60 * 1000, // 10 minutes
-      userData: { email, name: userName, password, referralId }
-    })
+    // 🚀 ПОЛНАЯ АСИНХРОННАЯ РЕГИСТРАЦИЯ ЧЕРЕЗ ОЧЕРЕДЬ
+    try {
+      // Проверяем существование пользователя ПЕРЕД добавлением в очередь
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { username: userName }
+          ]
+        }
+      });
 
-    // Use new email service
-    await emailService.sendVerificationEmail(email, verificationCode, verificationToken)
-    
-    // ✅ Подтверждение успешной отправки
-    console.log(`|mlm-backend  | [REGISTRATION] Email sent successfully to ${email}`);
+      if (existingUser) {
+        return res.status(400).json({ error: 'User with this email or username already exists' });
+      }
 
-    res.json({ success: true, message: 'Verification code and link sent to your email' })
+      const jobId = await queueService.addUserRegistration({
+        email,
+        username: userName,
+        password,
+        referralCode: referralId
+      });
+      
+      if (jobId) {
+        console.log(`|mlm-backend  | [REGISTRATION] QUEUED: ${email} | JOB: ${jobId}`);
+        
+        // Быстрый ответ пользователю - регистрация обрабатывается в фоне
+        res.json({ 
+          success: true, 
+          message: 'Registration initiated. Check your email for verification instructions.',
+          jobId: jobId
+        });
+      } else {
+        // Queue вернула null - переходим к fallback
+        throw new Error('Queue returned null jobId');
+      }
+      
+    } catch (queueError) {
+      console.log(`⚠️ Queue error: ${queueError.message}, processing registration synchronously`);
+      
+      // Fallback к синхронной обработке
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { username: userName }
+          ]
+        }
+      })
+
+      if (existingUser) {
+        return res.status(400).json({ error: 'User with this email or username already exists' })
+      }
+
+      // Generate verification code
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      
+      // ✅ Формируем ссылку верификации для fallback режима
+      const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
+      const verifyUrl = `${baseUrl}/verify?token=${verificationToken}`;
+      
+      // ✅ ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ В FALLBACK РЕЖИМЕ
+      console.log(`|mlm-backend  | [REGISTRATION] EMAIL: ${email}`);
+      console.log(`|mlm-backend  | [REGISTRATION] CODE: ${verificationCode}`);
+      console.log(`|mlm-backend  | [REGISTRATION] TOKEN: ${verificationToken}`);
+      console.log(`|mlm-backend  | [REGISTRATION] LINK: ${verifyUrl}`);
+      console.log(`|mlm-backend  | [REGISTRATION] MODE: FALLBACK-SYNC`);
+      
+      // Store verification code and token temporarily
+      if (!global.verificationCodes) global.verificationCodes = new Map()
+      global.verificationCodes.set(email, {
+        code: verificationCode,
+        token: verificationToken,
+        expires: Date.now() + 10 * 60 * 1000, // 10 minutes
+        userData: { email, name: userName, password, referralId }
+      })
+
+      // Синхронная отправка email через Mailgun
+      try {
+        await emailService.sendVerificationEmail(email, verificationCode, verificationToken);
+        console.log(`|mlm-backend  | [EMAIL] MAILGUN SENT TO: ${email} | CODE: ${verificationCode}`);
+      } catch (emailError) {
+        console.error(`❌ Email sending failed: ${emailError.message}`);
+        // Даже если email не отправился, возвращаем успех
+        console.log(`|mlm-backend  | [EMAIL] FAILED TO: ${email} | CODE: ${verificationCode}`);
+      }
+
+      res.json({ success: true, message: 'Verification code and link sent to your email' })
+    }
   } catch (error) {
     console.error('Registration error:', error)
     res.status(500).json({ error: 'Failed to register user' })
@@ -502,9 +627,15 @@ app.post('/api/reset-password', async (req, res) => {
     // Generate reset token
     const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     
-    // ✅ Логирование процесса восстановления пароля согласно паттерну
+    // ✅ Формируем ссылку для восстановления пароля
     const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+    
+    // ✅ ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ВОССТАНОВЛЕНИЯ ПАРОЛЯ
+    console.log(`|mlm-backend  | [PASSWORD-RESET] EMAIL: ${email}`);
+    console.log(`|mlm-backend  | [PASSWORD-RESET] TOKEN: ${resetToken}`);
+    console.log(`|mlm-backend  | [PASSWORD-RESET] LINK: ${resetUrl}`);
+    console.log(`|mlm-backend  | [PASSWORD-RESET] EXPIRES: ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}`);
     
     // Store reset token in user record with expiry (1 hour)
     await prisma.user.update({
@@ -515,8 +646,26 @@ app.post('/api/reset-password', async (req, res) => {
       }
     })
 
-    // Use email service to send reset email
-    await emailService.sendPasswordResetEmail(email, resetToken)
+    // 🚀 Асинхронная отправка reset email через очередь
+    try {
+      const jobId = await queueService.addEmailSend({
+        type: 'password-reset',
+        to: email,
+        token: resetToken
+      });
+      
+      if (jobId) {
+        console.log(`|mlm-backend  | [EMAIL] QUEUED PASSWORD-RESET TO: ${email} | TOKEN: ${resetToken} | JOB: ${jobId}`);
+      } else {
+        // Queue вернула null - переходим к fallback
+        throw new Error('Queue returned null jobId');
+      }
+    } catch (queueError) {
+      // Fallback к синхронной отправке если очереди недоступны
+      console.log(`⚠️ Queue error: ${queueError.message}, sending password reset email synchronously`);
+      await emailService.sendPasswordResetEmail(email, resetToken);
+      console.log(`|mlm-backend  | [EMAIL] MAILGUN SENT TO: ${email} | CODE: ${resetToken}`);
+    }
     
     res.json({ 
       success: true, 
@@ -849,28 +998,71 @@ app.get('/api/verify-email', async (req, res) => {
   if (!token) {
     return res.status(400).json({ error: 'Token is required' });
   }
+  
+  console.log(`[VERIFY_TOKEN] Starting verification for token: ${token.substring(0, 20)}...`);
+  
   try {
+    // Проверяем токен верификации в таблице User
+    console.log(`[VERIFY_TOKEN] 🔍 Checking verification token in User table...`);
+    
     const user = await prisma.user.findFirst({
       where: {
         emailVerificationToken: token,
         emailVerificationExpires: { gte: new Date() },
       },
     });
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired token' });
+    
+    if (user) {
+      console.log(`[VERIFY_TOKEN] ✅ Token found in User table for: ${user.email}`);
+      
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
+        },
+      });
+      
+      console.log(`[VERIFY_TOKEN] ✅ Email verified successfully for: ${user.email}`);
+      
+      // Генерируем JWT токен для автоматического логина
+      const token = generateToken(user);
+      
+      // Возвращаем JWT токен + данные пользователя для автоматического логина
+      return res.json({ 
+        success: true, 
+        message: 'Email verified successfully',
+        email: user.email,
+        token: token,
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          balance: user.balance,
+          bonus: user.bonus,
+          rank: user.rank,
+          referralCode: user.referralCode,
+          referredBy: user.referredBy,
+          isAdmin: user.isAdmin,
+          emailVerified: true,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          wallet: user.wallet,
+          lastLogin: user.lastLogin,
+          isBlocked: user.isBlocked
+        }
+      });
     }
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationExpires: null,
-      },
+    
+    console.log(`[VERIFY_TOKEN] ❌ Invalid or expired token: ${token}`);
+    return res.status(400).json({ 
+      success: false,
+      error: 'Invalid or expired token' 
     });
-    // Редирект на красивую страницу фронта
-    return res.redirect('https://transgresse.netlify.app/email-verified');
+    
   } catch (error) {
-    console.error('Email verification error:', error);
+    console.error('[VERIFY_TOKEN] ❌ Email verification error:', error);
     res.status(500).json({ error: 'Failed to verify email' });
   }
 });
@@ -932,7 +1124,9 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
 
 // Get user avatar separately for performance
 app.get('/api/profile/avatar', authenticateToken, async (req, res) => {
-  console.log('GET /api/profile/avatar called');
+  console.log('🔍 [AVATAR] GET /api/profile/avatar called');
+  console.log('🔍 [AVATAR] Headers:', req.headers);
+  console.log('🔍 [AVATAR] User ID:', req.user.id);
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -1143,6 +1337,11 @@ app.post('/api/withdraw', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' })
     }
 
+    // Check minimum withdrawal amount
+    if (amount < 50) {
+      return res.status(400).json({ error: 'Minimum withdrawal amount is $50' })
+    }
+
     // Check if user has enough balance
     const user = await prisma.user.findUnique({
       where: { id: userId }
@@ -1164,36 +1363,64 @@ app.post('/api/withdraw', authenticateToken, async (req, res) => {
       })
     }
 
-    // Create withdrawal transaction
-    const transaction = await prisma.transaction.create({
-      data: {
+    // 🚀 Асинхронная обработка вывода через очередь
+    try {
+      const jobId = await queueService.addWithdrawalProcess({
         userId,
-        type: 'WITHDRAWAL',
         amount: parseFloat(amount),
-        description: `Withdrawal to ${wallet}`,
-        status: 'PENDING',
-        wallet: wallet || '' // сохраняем кошелек в поле wallet
+        wallet: wallet || '',
+        username: user.username
+      });
+      
+      if (jobId) {
+        console.log(`[WITHDRAWAL] Withdrawal job queued: ${jobId}`);
+        
+        // Быстрый ответ пользователю - вывод обрабатывается в фоне
+        res.json({ 
+          success: true, 
+          message: 'Withdrawal request submitted and queued for processing',
+          jobId: jobId,
+          status: 'queued'
+        });
+      } else {
+        // Queue вернула null - переходим к fallback
+        throw new Error('Queue returned null jobId');
       }
-    })
-
-    // Update user balance
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        balance: {
-          decrement: parseFloat(amount)
+      
+    } catch (queueError) {
+      console.log(`⚠️ Queue error: ${queueError.message}, processing withdrawal synchronously`);
+      
+      // Fallback к синхронной обработке
+      const transaction = await prisma.transaction.create({
+        data: {
+          userId,
+          type: 'WITHDRAWAL',
+          amount: parseFloat(amount),
+          description: `Withdrawal to ${wallet}`,
+          status: 'PENDING',
+          wallet: wallet || ''
         }
-      }
-    })
+      });
 
-    console.log(`[WITHDRAWAL] User ${user.username} requested withdrawal of $${amount} to wallet ${wallet}`)
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          balance: {
+            decrement: parseFloat(amount)
+          }
+        }
+      });
 
-    res.json({ 
-      success: true, 
-      balance: updatedUser.balance,
-      transaction,
-      message: 'Withdrawal request submitted successfully'
-    })
+      console.log(`[WITHDRAWAL] User ${user.username} requested withdrawal of $${amount} to wallet ${wallet} (fallback mode)`);
+
+      res.json({ 
+        success: true, 
+        balance: updatedUser.balance,
+        transaction,
+        message: 'Withdrawal request submitted successfully (fallback mode)',
+        status: 'completed'
+      });
+    }
   } catch (error) {
     console.error('Withdraw error:', error)
     res.status(500).json({ error: 'Withdrawal failed' })
@@ -1292,19 +1519,48 @@ app.post('/api/investments', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Package not found' })
     }
     
-    // Выполняем инвестицию синхронно (все проверки внутри сервиса)
-    const investment = await investmentService.createInvestment(userId, packageId, amount)
+    // 🚀 Асинхронное создание инвестиции через очередь
+    try {
+      const jobId = await queueService.addInvestmentCreation({
+        userId,
+        packageId,
+        amount,
+        packageName: packageData.name
+      });
+      
+      if (jobId) {
+        console.log(`[INVESTMENTS] Investment job queued: ${jobId}`);
+        
+        // Быстрый ответ пользователю - инвестиция обрабатывается в фоне
+        res.json({
+          success: true,
+          message: 'Investment initiated. Processing in background.',
+          jobId: jobId,
+          status: 'queued'
+        });
+      } else {
+        // Queue вернула null - переходим к fallback
+        throw new Error('Queue returned null jobId');
+      }
+      
+    } catch (queueError) {
+      console.log(`⚠️ Queue error: ${queueError.message}, processing investment synchronously`);
+      
+      // Fallback к синхронной обработке
+      const investment = await investmentService.createInvestment(userId, packageId, amount)
+      
+      console.log('[INVESTMENTS] Investment created synchronously:', investment.id)
+      
+      res.json({
+        success: true,
+        message: 'Investment completed successfully (fallback mode)',
+        investment: investment,
+        name: packageData.name,
+        amount: amount,
+        status: 'completed'
+      });
+    }
     
-    console.log('[INVESTMENTS] Investment created successfully:', investment.id)
-    
-    // Возвращаем мгновенный результат
-    res.json({
-      success: true,
-      message: 'Investment completed successfully',
-      investment: investment,
-      name: packageData.name,
-      amount: amount
-    })
   } catch (error) {
     console.error('[INVESTMENTS] ERROR:', error)
     res.status(400).json({ error: error.message })
@@ -1395,8 +1651,42 @@ app.get('/api/ranks/user/:userId', async (req, res) => {
 app.post('/api/ranks/update/:userId', async (req, res) => {
   try {
     const { userId } = req.params
-    const rank = await rankService.updateUserRank(parseInt(userId))
-    res.json({ rank })
+    
+    // 🚀 Асинхронное обновление ранга через очередь
+    try {
+      const jobId = await queueService.addRankUpdate({
+        userId: parseInt(userId),
+        timestamp: new Date().toISOString()
+      });
+      
+      if (jobId) {
+        console.log(`[RANKS] Rank update job queued: ${jobId}`);
+        
+        // Быстрый ответ - обновление ранга обрабатывается в фоне
+        res.json({ 
+          success: true,
+          message: 'Rank update initiated. Processing in background.',
+          jobId: jobId,
+          status: 'queued'
+        });
+      } else {
+        // Queue вернула null - переходим к fallback
+        throw new Error('Queue returned null jobId');
+      }
+      
+    } catch (queueError) {
+      console.log(`⚠️ Queue error: ${queueError.message}, processing rank update synchronously`);
+      
+      // Fallback к синхронной обработке
+      const rank = await rankService.updateUserRank(parseInt(userId))
+      res.json({ 
+        success: true,
+        rank,
+        status: 'completed',
+        message: 'Rank updated successfully (fallback mode)'
+      });
+    }
+    
   } catch (error) {
     res.status(400).json({ error: error.message })
   }
@@ -1697,6 +1987,10 @@ app.post('/api/rank-rewards/claim', authenticateToken, async (req, res) => {
 
 // Profile management endpoints
 app.put('/api/profile/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+  console.log('🔍 [AVATAR] PUT /api/profile/avatar called');
+  console.log('🔍 [AVATAR] Headers:', req.headers);
+  console.log('🔍 [AVATAR] User ID:', req.user.id);
+  console.log('🔍 [AVATAR] File:', req.file);
   try {
     const userId = req.user.id
     
@@ -1912,6 +2206,38 @@ app.post('/api/admin/transactions', authenticateToken, requireAdmin, async (req,
         status: 'COMPLETED'
       }
     });
+
+    // Обновляем баланс пользователя в зависимости от типа транзакции
+    let balanceChange = 0;
+    switch (type) {
+      case 'DEPOSIT':
+      case 'BONUS':
+      case 'REFERRAL_BONUS':
+      case 'RANK_REWARD':
+      case 'DAILY_PROFIT':
+        balanceChange = parseFloat(amount); // Положительные транзакции
+        break;
+      case 'WITHDRAWAL':
+      case 'INVESTMENT':
+        balanceChange = -parseFloat(amount); // Отрицательные транзакции
+        break;
+      default:
+        console.log(`[ADMIN] Unknown transaction type: ${type}, not updating balance`);
+        break;
+    }
+
+    if (balanceChange !== 0) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          balance: {
+            increment: balanceChange
+          }
+        }
+      });
+      console.log(`[ADMIN] Updated balance for user ${user.id}: ${balanceChange > 0 ? '+' : ''}${balanceChange}`);
+    }
+
     // Если это DAILY_PROFIT и есть investmentId, увеличиваем totalEarned
     if (type === 'DAILY_PROFIT' && investment) {
       await prisma.investment.update({
@@ -1919,9 +2245,60 @@ app.post('/api/admin/transactions', authenticateToken, requireAdmin, async (req,
         data: { totalEarned: { increment: parseFloat(amount) } }
       });
     }
-    res.json({ success: true, transaction });
+
+    // Получаем обновленный баланс пользователя
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { balance: true }
+    });
+
+    res.json({ 
+      success: true, 
+      transaction,
+      newBalance: updatedUser.balance,
+      balanceChange: balanceChange
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// API для проверки статуса очередей
+app.get('/api/queue/status', async (req, res) => {
+  try {
+    const stats = await queueService.getQueueStats();
+    const health = await queueService.checkQueueHealth();
+    
+    res.json({
+      success: true,
+      queueStats: stats,
+      queueHealth: health,
+      isStarted: queueService.isStarted,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      isStarted: queueService.isStarted
+    });
+  }
+});
+
+// API для пересчета баланса пользователя
+app.post('/api/admin/recalculate-balance/:userId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const newBalance = await recalculateUserBalance(userId);
+    
+    res.json({ 
+      success: true, 
+      message: `Balance recalculated for user ${userId}`,
+      newBalance: newBalance
+    });
+  } catch (error) {
+    console.error(`[ADMIN] Balance recalculation failed for user ${req.params.userId}:`, error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -1987,6 +2364,44 @@ app.put('/api/admin/packages/:id', authenticateToken, requireAdmin, async (req, 
     res.status(400).json({ error: error.message })
   }
 })
+
+// Функция для пересчета баланса пользователя на основе транзакций
+async function recalculateUserBalance(userId) {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      where: { userId: parseInt(userId) },
+      select: { type: true, amount: true }
+    });
+
+    let balance = 0;
+    transactions.forEach(tx => {
+      switch (tx.type) {
+        case 'DEPOSIT':
+        case 'BONUS':
+        case 'REFERRAL_BONUS':
+        case 'RANK_REWARD':
+        case 'DAILY_PROFIT':
+          balance += parseFloat(tx.amount);
+          break;
+        case 'WITHDRAWAL':
+        case 'INVESTMENT':
+          balance -= parseFloat(tx.amount);
+          break;
+      }
+    });
+
+    await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { balance: balance }
+    });
+
+    console.log(`[ADMIN] Recalculated balance for user ${userId}: $${balance}`);
+    return balance;
+  } catch (error) {
+    console.error(`[ADMIN] Error recalculating balance for user ${userId}:`, error);
+    throw error;
+  }
+}
 
 app.delete('/api/admin/packages/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -2065,18 +2480,53 @@ process.on('SIGTERM', async () => {
   process.exit(0)
 })
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully...')
-  await scheduler.stop()
-  await prisma.$disconnect()
-  process.exit(0)
-})
+
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-  console.log('Queue system and scheduler started')
-}); 
+
+// Инициализация PG-BOSS при запуске сервера
+async function startServer() {
+  try {
+    // Инициализируем очереди задач
+    await queueService.initialize();
+    console.log('✅ Queue service initialized');
+    
+    // Запускаем сервер
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log('✅ Queue system and scheduler started');
+      console.log('📊 Performance optimization: ACTIVE');
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    
+    // Запускаем сервер даже если очереди не работают (fallback mode)
+    console.log('⚠️ Starting server in fallback mode (without queues)');
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT} (FALLBACK MODE)`);
+      console.log('⚠️ Queue system disabled - using synchronous processing');
+    });
+  }
+}
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🔄 SIGTERM received, shutting down gracefully...');
+  await queueService.shutdown();
+  await scheduler.stop();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('🔄 SIGINT received, shutting down gracefully...');
+  await queueService.shutdown();
+  await scheduler.stop();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+startServer(); 
 
 // Добавить эндпоинт для получения инвестиций пользователя (только для админа)
 app.get('/api/admin/user/:id/investments', authenticateToken, async (req, res) => {

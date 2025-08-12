@@ -75,51 +75,45 @@ class OptimizedRankRewardService {
     
     try {
       // Оптимизированный запрос - получаем все данные одним запросом
-      const userWithReferrals = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          referrals: {
-            include: {
-              investments: {
-                where: { isActive: true },
-                select: { amount: true }
-              },
-              referrals: {
-                include: {
-                  investments: {
-                    where: { isActive: true },
-                    select: { amount: true }
-                  },
-                  referrals: {
-                    include: {
-                      investments: {
-                        where: { isActive: true },
-                        select: { amount: true }
-                      },
-                      referrals: {
-                        include: {
-                          investments: {
-                            where: { isActive: true },
-                            select: { amount: true }
-                          },
-                          referrals: {
-                            include: {
-                              investments: {
-                                where: { isActive: true },
-                                select: { amount: true }
-                              },
-                              referrals: {
-                                include: {
-                                  investments: {
-                                    where: { isActive: true },
-                                    select: { amount: true }
-                                  },
-                                  referrals: {
-                                    include: {
-                                      investments: {
-                                        where: { isActive: true },
-                                        select: { amount: true }
-                                      }
+      const userWithReferrals = await this.executeWithRetry(async () => {
+        return await prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            referrals: {
+              include: {
+                investments: {
+                  where: { isActive: true },
+                  select: { amount: true }
+                },
+                referrals: {
+                  include: {
+                    investments: {
+                      where: { isActive: true },
+                      select: { amount: true }
+                    },
+                    referrals: {
+                      include: {
+                        investments: {
+                          where: { isActive: true },
+                          select: { amount: true }
+                        },
+                        referrals: {
+                          include: {
+                            investments: {
+                              where: { isActive: true },
+                              select: { amount: true }
+                            },
+                            referrals: {
+                              include: {
+                                investments: {
+                                  where: { isActive: true },
+                                  select: { amount: true }
+                                },
+                                referrals: {
+                                  include: {
+                                    investments: {
+                                      where: { isActive: true },
+                                      select: { amount: true }
                                     }
                                   }
                                 }
@@ -134,7 +128,7 @@ class OptimizedRankRewardService {
               }
             }
           }
-        }
+        });
       });
       
       if (!userWithReferrals) {
@@ -176,6 +170,13 @@ class OptimizedRankRewardService {
       
     } catch (error) {
       console.error('[OptimizedRankRewardService] Error calculating turnover:', error);
+      
+      // Если ошибка соединения с БД, возвращаем 0
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+        console.log('[OptimizedRankRewardService] Database connection error, returning 0');
+        return 0;
+      }
+      
       return 0;
     }
   }
@@ -218,11 +219,13 @@ class OptimizedRankRewardService {
   // Получить заклеймленные награды
   async getClaimedRewards(userId) {
     try {
-      const txs = await prisma.transaction.findMany({
-        where: {
-          userId,
-          type: 'RANK_REWARD'
-        }
+      const txs = await this.executeWithRetry(async () => {
+        return await prisma.transaction.findMany({
+          where: {
+            userId,
+            type: 'RANK_REWARD'
+          }
+        });
       });
       
       const claimed = txs.map(tx => {
@@ -240,6 +243,13 @@ class OptimizedRankRewardService {
       return claimed;
     } catch (error) {
       console.error('[OptimizedRankRewardService] Error getting claimed rewards:', error);
+      
+      // Если ошибка соединения с БД, возвращаем пустой массив
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+        console.log('[OptimizedRankRewardService] Database connection error, returning empty array');
+        return [];
+      }
+      
       return [];
     }
   }
