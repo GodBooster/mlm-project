@@ -8,11 +8,9 @@ import RankRewardsPage from './RankRewardsPage';
 import ReportPage from './ReportPage';
 import WithdrawModal from './WithdrawModal';
 import ToastContainer from './components/ToastContainer';
-import PasswordChangeModal from './components/PasswordChangeModal';
-import DepositModal from './components/DepositModal';
-import AvatarChangeModal from './components/AvatarChangeModal';
-import InvestmentModal from './components/InvestmentModal';
 import { useToast } from './hooks/useToast';
+import { useModal } from './hooks/useModal';
+import Modal from './components/Modal';
 
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -35,9 +33,9 @@ const InvestorDashboard = () => {
   const [currentPage, setCurrentPage] = useState(getInitialPage());
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [purchaseAmount, setPurchaseAmount] = useState('');
-  const [showDepositModal, setShowDepositModal] = useState(false);
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-
+  const [modalAmount, setModalAmount] = useState('');
+  const [walletAddress, setWalletAddress] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -55,14 +53,21 @@ const InvestorDashboard = () => {
   const [currentRank, setCurrentRank] = useState(1);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [rankData, setRankData] = useState(null);
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [userAvatar, setUserAvatar] = useState(null); // Отдельное состояние для аватара
   const [sponsorAvatar, setSponsorAvatar] = useState(null); // Состояние для аватара спонсора
+
+  // Используем новый хук для модальных окон
+  const { isOpen: showDepositModal, open: openDepositModal, close: closeDepositModal } = useModal(false);
+  const { isOpen: showWithdrawModal, open: openWithdrawModal, close: closeWithdrawModal } = useModal(false);
+  const { isOpen: showAvatarModal, open: openAvatarModal, close: closeAvatarModal } = useModal(false);
+  const { isOpen: showPasswordModal, open: openPasswordModal, close: closePasswordModal } = useModal(false);
+  const { isOpen: withdrawOpen, open: openWithdrawModalUnified, close: closeWithdrawModalUnified } = useModal(false);
 
   // --- Optimized computed values ---
   const pendingWithdraw = useMemo(() => {
@@ -438,10 +443,22 @@ const InvestorDashboard = () => {
   // Note: Referral handling is now done in LoginPage component
 
   // --- Оптимизированные модальные функции ---
-  const openDepositModal = useCallback(() => { 
-    setShowDepositModal(true); 
-    setModalAmount(''); 
-  }, []);
+  const openDepositModalHandler = useCallback(() => {
+    openDepositModal();
+    setModalAmount('');
+  }, [openDepositModal]);
+
+  const openWithdrawModalHandler = useCallback(() => {
+    openWithdrawModalUnified();
+  }, [openWithdrawModalUnified]);
+
+  const openAvatarModalHandler = useCallback(() => {
+    openAvatarModal();
+  }, [openAvatarModal]);
+
+  const openPasswordModalHandler = useCallback(() => {
+    openPasswordModal();
+  }, [openPasswordModal]);
 
   const handleWithdrawModal = useCallback(async (amount, wallet) => {
     setLoading(true);
@@ -474,7 +491,110 @@ const InvestorDashboard = () => {
     }
   }, [token]);
 
+  const handleModalWithdraw = useCallback(async () => {
+    if (!modalAmount || isNaN(modalAmount) || Number(modalAmount) <= 0) {
+      showError('Enter a valid withdrawal amount!');
+      return;
+    }
+    setModalLoading(true);
+    try {
+      const res = await fetch(`${API}/api/withdraw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          amount: Number(modalAmount),
+          wallet: walletAddress
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUserData(u => ({ ...u, balance: data.balance }));
+        // Обновляем профиль пользователя после вывода
+        const profileRes = await fetch(`${API}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
+        const profileData = await profileRes.json();
+        setUserData(profileData);
+        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(res => res.json()).then(setTransactions);
+    closeWithdrawModal(); 
+    setModalAmount(''); 
+    setWalletAddress('');
+      } else {
+        showError(data.error || 'Withdrawal error');
+      }
+    } finally {
+      setModalLoading(false);
+    }
+  }, [modalAmount, walletAddress, token]);
 
+  // Добавляем стейты для депозита
+  const [depositAddress, setDepositAddress] = useState('');
+  const [selectedNetwork, setSelectedNetwork] = useState('BSC');
+  const [isGeneratingAddress, setIsGeneratingAddress] = useState(false);
+
+  const closeModal = useCallback(() => {
+    closeDepositModal();
+    closeWithdrawModal();
+    setModalAmount('');
+    setWalletAddress('');
+    setDepositAddress('');
+  }, [closeDepositModal, closeWithdrawModal]);
+
+  const generateDepositAddress = useCallback(async () => {
+    setIsGeneratingAddress(true);
+    try {
+      const res = await fetch(`${API}/api/deposit/generate-address`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ network: selectedNetwork })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDepositAddress(data.depositAddress);
+        showSuccess(`Deposit address generated for ${selectedNetwork} network`);
+      } else {
+        showError(data.error || 'Failed to generate deposit address');
+      }
+    } catch (error) {
+      showError('Network error. Please try again.');
+    } finally {
+      setIsGeneratingAddress(false);
+    }
+  }, [selectedNetwork, token, showSuccess, showError]);
+
+  const handleModalDeposit = useCallback(async () => {
+    if (!modalAmount || isNaN(modalAmount) || Number(modalAmount) <= 0) {
+      showError('Enter a valid deposit amount!');
+      return;
+    }
+    setModalLoading(true);
+    try {
+      const res = await fetch(`${API}/api/deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ amount: Number(modalAmount) })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUserData(u => ({ ...u, balance: data.balance }));
+        fetch(`${API}/api/transactions`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(res => res.json()).then(setTransactions);
+        closeModal();
+      } else {
+        showError(data.error || 'Deposit error');
+      }
+    } finally {
+      setModalLoading(false);
+    }
+  }, [modalAmount, token, showError, closeModal]);
 
   // Image compression utility
   const compressImage = useCallback((file, maxWidth = 100, maxHeight = 100, quality = 0.6) => {
@@ -525,31 +645,125 @@ const InvestorDashboard = () => {
     });
   }, []);
 
+  // Profile management functions
+  const handleAvatarUpload = useCallback(async () => {
+    if (!avatarFile) return;
+    
+    setProfileLoading(true);
+    try {
+      // Проверяем формат файла
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+      if (!allowedTypes.includes(avatarFile.type)) {
+        showError('Only PNG, JPG, JPEG, and SVG files are allowed');
+        setProfileLoading(false);
+        return;
+      }
 
+      // Проверяем размер файла
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      if (avatarFile.size > maxSize) {
+        showError('Image size must be less than 2MB');
+        setProfileLoading(false);
+        return;
+      }
 
-  // Modal close handlers
-  const handlePasswordModalClose = useCallback(() => {
-    setShowPasswordModal(false);
-  }, []);
+      // Сжимаем изображение (только для растровых форматов)
+      let fileToUpload = avatarFile;
+      if (avatarFile.type !== 'image/svg+xml') {
+        try {
+          const compressedFile = await compressImage(avatarFile);
+          fileToUpload = compressedFile;
+          
+          // Проверяем размер после сжатия
+          if (compressedFile.size > 30 * 1024) { // 30KB
+            // Если файл все еще слишком большой, попробуем сжать еще сильнее
+            if (compressedFile.size > 50 * 1024) { // 50KB
+              console.log('First compression resulted in', compressedFile.size, 'bytes, trying more aggressive compression');
+              const secondCompression = await compressImage(avatarFile, 80, 80, 0.4);
+              if (secondCompression.size < compressedFile.size) {
+                fileToUpload = secondCompression;
+              }
+            }
+            
+            if (fileToUpload.size > 50 * 1024) { // 50KB
+              showError('Image is too large even after compression. Please use a smaller image.');
+              setProfileLoading(false);
+              return;
+            } else if (fileToUpload.size > 30 * 1024) { // 30KB
+              showWarning('Image is large and may slow down login. Consider using a smaller image.');
+            }
+          }
+        } catch (error) {
+          console.error('Image compression error:', error);
+          showError('Failed to compress image. Please try a different image.');
+          setProfileLoading(false);
+          return;
+        }
+      }
+      
+      const formData = new FormData();
+      formData.append('avatar', fileToUpload, avatarFile.name);
+      
+      const res = await fetch(`${API}/api/profile/avatar`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setUserAvatar(data.avatar); // Обновляем отдельное состояние аватара
+        closeAvatarModal();
+        setAvatarFile(null);
+        showSuccess('Avatar updated successfully!');
+      } else {
+        showError(data.error || 'Failed to update avatar');
+      }
+    } catch (error) {
+      console.error('Avatar update error:', error);
+      showError('Failed to update avatar');
+    }
+    setProfileLoading(false);
+  }, [avatarFile, token]);
 
-  const handleDepositModalClose = useCallback(() => {
-    setShowDepositModal(false);
-  }, []);
-
-  const handleAvatarModalClose = useCallback(() => {
-        setShowAvatarModal(false);
-  }, []);
-
-  const handleInvestmentModalClose = useCallback(() => {
-    setShowInvestmentModal(false);
-    setSelectedPackage(null);
-  }, []);
-
-  // Investment modal open handler
-  const handleOpenInvestmentModal = useCallback((pkg) => {
-    setSelectedPackage(pkg);
-    setShowInvestmentModal(true);
-  }, []);
+  const handlePasswordChange = useCallback(async () => {
+    if (newPassword !== confirmPassword) {
+      showError('New passwords do not match');
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      showError('Password must be at least 6 characters long');
+      return;
+    }
+    
+    setProfileLoading(true);
+    try {
+      const res = await fetch(`${API}/api/profile/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        closePasswordModal();
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        showSuccess('Password updated successfully');
+      } else {
+        showError(data.error || 'Failed to update password');
+      }
+    } catch (error) {
+      console.error('Password update error:', error);
+      showError('Failed to update password');
+    }
+    setProfileLoading(false);
+  }, [currentPassword, newPassword, confirmPassword, token]);
 
   // --- Invest logic ---
   const handleInvest = async (pkg, amount = purchaseAmount) => {
@@ -652,15 +866,6 @@ const InvestorDashboard = () => {
 
   return (
     <div className="glass-bg min-h-screen">
-      {/* Блокировка контента при открытом модальном окне */}
-      <div 
-        className={(showPasswordModal || showDepositModal || showAvatarModal || showInvestmentModal || withdrawOpen) ? 'pointer-events-none select-none opacity-60 blur-[2px] transition-all duration-300' : 'transition-all duration-300'}
-        style={(showPasswordModal || showDepositModal || showAvatarModal || showInvestmentModal || withdrawOpen) ? { 
-          filter: 'blur(2px) brightness(0.7)',
-          userSelect: 'none',
-          pointerEvents: 'none'
-        } : {}}
-      >
       {/* Hamburger for mobile - positioned at top right */}
       <button
         className={`sm:hidden fixed top-4 right-4 z-50 bg-black/50 rounded-lg p-2 flex items-center justify-center transition-opacity ${
@@ -811,8 +1016,8 @@ const InvestorDashboard = () => {
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4">
-                        <button onClick={openDepositModal} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
-                        <button onClick={() => setWithdrawOpen(true)} className="flex-1 inactive-button text-white py-2 px-4 rounded-lg">Withdraw</button>
+                        <button onClick={openDepositModalHandler} className="flex-1 orange-button text-white py-2 px-4 rounded-lg">Deposit</button>
+                        <button onClick={openWithdrawModalHandler} className="flex-1 inactive-button text-white py-2 px-4 rounded-lg">Withdraw</button>
                       </div>
                     </div>
                   </Card>
@@ -864,14 +1069,14 @@ const InvestorDashboard = () => {
                       </div>
                       <div className="flex flex-col gap-1 sm:gap-2 flex-shrink-0">
                         <button 
-                          onClick={() => setShowPasswordModal(true)}
+                          onClick={openPasswordModalHandler}
                           className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-1.5 sm:p-2 rounded-lg transition-all duration-200"
                           title="Change Password"
                         >
                           <Lock size={14} className="sm:w-4 sm:h-4" />
                         </button>
                         <button 
-                          onClick={() => setShowAvatarModal(true)}
+                          onClick={openAvatarModalHandler}
                           className="bg-orange-500/60 hover:bg-orange-500 text-white p-1.5 sm:p-2 rounded-lg transition-all duration-200"
                           title="Change Avatar"
                         >
@@ -977,8 +1182,8 @@ const InvestorDashboard = () => {
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <button onClick={openDepositModal} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
-                    <button onClick={() => setWithdrawOpen(true)} className="inactive-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Withdraw</button>
+                    <button onClick={openDepositModalHandler} className="orange-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Deposit</button>
+                    <button onClick={openWithdrawModalHandler} className="inactive-button text-white py-1.5 px-3 rounded-lg text-sm w-full sm:w-auto">Withdraw</button>
                   </div>
                 </Card>
                 {/* Transaction History Table */}
@@ -1065,8 +1270,118 @@ const InvestorDashboard = () => {
                 </Card>
               </div>
             )}
+            {/* Deposit/Withdraw Modals */}
+            <Modal
+              isOpen={showDepositModal}
+              onClose={closeDepositModal}
+              title="Deposit Funds"
+              size="md"
+            >
+              <div className="space-y-4">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <p className="text-blue-400 text-sm">Generate a unique deposit address for secure cryptocurrency transfers</p>
+                </div>
+                
+                <div>
+                  <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select Network</label>
+                  <select 
+                    value={selectedNetwork} 
+                    onChange={e => setSelectedNetwork(e.target.value)}
+                    className="w-full glass-input px-4 py-3 text-white focus:outline-none"
+                  >
+                    <option value="BSC">BSC (Binance Smart Chain)</option>
+                    <option value="TRX">TRX (Tron Network)</option>
+                  </select>
+                </div>
 
-            {currentPage === 'packages' && <SimpleInvestmentPage userData={userData} packages={packages} onInvest={handleOpenInvestmentModal} loading={loading} />}
+                {!depositAddress ? (
+                  <button 
+                    onClick={generateDepositAddress} 
+                    className="w-full orange-button text-white py-3 rounded-lg" 
+                    disabled={isGeneratingAddress}
+                  >
+                    {isGeneratingAddress ? 'Generating Address...' : 'Generate Deposit Address'}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[rgb(249,115,22)] text-sm mb-2">Your Deposit Address ({selectedNetwork})</label>
+                      <div className="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
+                        <span className="text-white font-mono text-sm break-all">{depositAddress}</span>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(depositAddress);
+                            showSuccess('Address copied to clipboard!');
+                          }}
+                          className="ml-2 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                      <p className="text-green-400 text-sm">
+                        <strong>Important:</strong> Send only {selectedNetwork} compatible tokens to this address. 
+                        Funds will be automatically credited to your account after network confirmation.
+                      </p>
+                    </div>
+
+                    <button 
+                      onClick={generateDepositAddress} 
+                      className="w-full glass-button text-white py-2 rounded-lg"
+                      disabled={isGeneratingAddress}
+                    >
+                      {isGeneratingAddress ? 'Generating...' : 'Generate New Address'}
+                    </button>
+                  </div>
+                )}
+                
+                <button onClick={closeDepositModal} className="w-full glass-button text-white py-2 rounded-lg">Close</button>
+              </div>
+            </Modal>
+
+            <Modal
+              isOpen={showWithdrawModal}
+              onClose={closeWithdrawModal}
+              title="Withdraw Funds"
+              size="md"
+            >
+              <div className="space-y-4">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                  <p className="text-orange-400 text-sm">You are about to start withdraw process. The process should be completed within a 72 hours.</p>
+                </div>
+                <div>
+                  <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select withdrawal amount</label>
+                  <input 
+                    type="number" 
+                    value={modalAmount} 
+                    onChange={e => setModalAmount(e.target.value)} 
+                    className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
+                    placeholder="Enter amount" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[rgb(249,115,22)] text-sm mb-2">Wallet's address</label>
+                  <input 
+                    type="text" 
+                    value={walletAddress}
+                    onChange={e => setWalletAddress(e.target.value)}
+                    className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
+                    placeholder="Enter your crypto wallet address" 
+                  />
+                </div>
+                <button 
+                  onClick={handleModalWithdraw} 
+                  className="w-full orange-button text-white py-3 rounded-lg" 
+                  disabled={modalLoading}
+                >
+                  {modalLoading ? 'Processing...' : 'Withdraw'}
+                </button>
+                <button onClick={closeWithdrawModal} className="w-full glass-button text-white py-2 rounded-lg">Cancel</button>
+              </div>
+            </Modal>
+            {currentPage === 'packages' && <SimpleInvestmentPage userData={userData} packages={packages} onInvest={handleInvest} loading={loading} />}
             {currentPage === 'referrals' && <ReferralSystemPage userData={userData} referralTree={referralTree} referralLink={referralLink} packages={packages} transactions={transactions} sponsor={sponsor} currentRank={currentRank} sponsorAvatar={sponsorAvatar} loadSponsorAvatar={loadSponsorAvatar} userAvatar={userAvatar} loadUserAvatar={loadUserAvatar} />}
             {currentPage === 'team' && <TeamPage referralTree={referralTree} userData={userData} tableView={tableView} currentRank={currentRank} />}
             {currentPage === 'rankrewards' && <RankRewardsPage onRankUpdate={handleRankUpdate} userData={userData} />}
@@ -1075,51 +1390,130 @@ const InvestorDashboard = () => {
         </div>
       </div>
 
-
-
-                </div>
-
-      {/* Изолированные модальные окна */}
-      <PasswordChangeModal 
-        isOpen={showPasswordModal}
-        onClose={handlePasswordModalClose}
-        token={token}
-        showSuccess={showSuccess}
-        showError={showError}
-      />
-
-      <DepositModal 
-        isOpen={showDepositModal}
-        onClose={handleDepositModalClose}
-        token={token}
-        showSuccess={showSuccess}
-        showError={showError}
-      />
-
-      <AvatarChangeModal 
+      {/* Avatar Upload Modal */}
+      <Modal
         isOpen={showAvatarModal}
-        onClose={handleAvatarModalClose}
-        token={token}
-        showSuccess={showSuccess}
-        showError={showError}
-        onAvatarUpdate={setUserAvatar}
-      />
+        onClose={closeAvatarModal}
+        title="Change Avatar"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select Image</label>
+            <input 
+              type="file" 
+              accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/jpg,image/svg+xml"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+                  if (!allowedTypes.includes(file.type)) {
+                    showError('Only PNG, JPG, JPEG, and SVG files are allowed');
+                    e.target.value = '';
+                    return;
+                  }
+                  setAvatarFile(file);
+                }
+              }}
+              className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
+            />
+            <div className="text-xs text-gray-400 mt-1">
+              Supported formats: PNG, JPG, JPEG, SVG. Max size: 2MB. Images will be automatically compressed to 100x100px for optimal performance
+            </div>
+          </div>
+          {avatarFile && (
+            <div className="text-sm text-gray-300">
+              Selected: {avatarFile.name} ({(avatarFile.size / 1024).toFixed(1)} KB)
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button 
+              onClick={handleAvatarUpload} 
+              disabled={!avatarFile || profileLoading}
+              className="flex-1 orange-button text-white py-3 rounded-lg disabled:opacity-50"
+            >
+              {profileLoading ? 'Uploading...' : 'Upload Avatar'}
+            </button>
+            <button 
+              onClick={() => {
+                closeAvatarModal();
+                setAvatarFile(null);
+              }} 
+              className="flex-1 glass-button text-white py-3 rounded-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
 
-      <InvestmentModal 
-        isOpen={showInvestmentModal}
-        onClose={handleInvestmentModalClose}
-        selectedPackage={selectedPackage}
-        userData={userData}
-        onInvest={handleInvest}
-        loading={loading}
-        showSuccess={showSuccess}
-        showError={showError}
-      />
+      {/* Password Change Modal */}
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={closePasswordModal}
+        title="Change Password"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[rgb(249,115,22)] text-sm mb-2">Current Password</label>
+            <input 
+              type="password" 
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
+              placeholder="Enter current password"
+            />
+          </div>
+          <div>
+            <label className="block text-[rgb(249,115,22)] text-sm mb-2">New Password</label>
+            <input 
+              type="password" 
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
+              placeholder="Enter new password"
+            />
+          </div>
+          <div>
+            <label className="block text-[rgb(249,115,22)] text-sm mb-2">Confirm New Password</label>
+            <input 
+              type="password" 
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full glass-input px-4 py-3 text-white focus:outline-none" 
+              placeholder="Confirm new password"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={handlePasswordChange} 
+              disabled={!currentPassword || !newPassword || !confirmPassword || profileLoading}
+              className="flex-1 orange-button text-white py-3 rounded-lg disabled:opacity-50"
+            >
+              {profileLoading ? 'Updating...' : 'Update Password'}
+            </button>
+            <button 
+              onClick={() => {
+                closePasswordModal();
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+              }} 
+              className="flex-1 glass-button text-white py-3 rounded-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+
 
       {/* Withdraw Modal (унифицированный) */}
       <WithdrawModal
         isOpen={withdrawOpen}
-        onClose={() => setWithdrawOpen(false)}
+        onClose={closeWithdrawModalUnified}
         onWithdraw={handleWithdrawModal}
         balance={userData.balance}
         savedWallet={userData.wallet}

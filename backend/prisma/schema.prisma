@@ -28,6 +28,9 @@ model User {
   emailVerified            Boolean        @default(false)
   isBlocked                Boolean        @default(false)
   lastLogin                DateTime?
+  // Поля для сброса пароля
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
   investments              Investment[]
   transactions             Transaction[]
   referrer                 User?          @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
