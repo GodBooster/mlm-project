@@ -29,6 +29,13 @@ class EmailService {
       to,
       subject,
       html,
+      headers: {
+        'X-Priority': '3',
+        'X-MSMail-Priority': 'Normal',
+        'X-Mailer': 'Margine Space Mailer',
+        'X-Report-Abuse': 'Please report abuse here: abuse@margine-space.com',
+        'List-Unsubscribe': '<mailto:unsubscribe@margine-space.com>'
+      },
       text: text || this.htmlToText(html)
     }
 
