@@ -174,7 +174,7 @@ async function sendVerificationEmail(to, code, token) {
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: false,
     auth: {
-      user: process.env.SMTP_USER || 'mlmuser@margine-space.com',
+      user: process.env.SMTP_USER || 'mlmuser',
       pass: process.env.SMTP_PASS || 'CoRK4gsQaUm6'
     },
     tls: {

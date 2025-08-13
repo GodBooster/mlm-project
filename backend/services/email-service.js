@@ -4,11 +4,11 @@ import nodemailer from 'nodemailer'
 class EmailService {
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || '162.244.24.181',
+      host: process.env.SMTP_HOST || 'mail.margine-space.com',
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false, // false для 587, true для 465
       auth: {
-        user: process.env.SMTP_USER || 'mlmuser@margine-space.com',
+        user: process.env.SMTP_USER || 'mlmuser',
         pass: process.env.SMTP_PASS || 'CoRK4gsQaUm6'
       },
       tls: {
@@ -53,7 +53,7 @@ class EmailService {
       port: 465, // SSL порт
       secure: true,
       auth: {
-        user: 'mlmuser@margine-space.com',
+        user: 'mlmuser',
         pass: 'CoRK4gsQaUm6'
       },
       tls: {
@@ -730,7 +730,7 @@ async verifyConnection() {
         port: 465,
         secure: true,
         auth: {
-          user: 'mlmuser@margine-space.com',
+          user: 'mlmuser',
           pass: 'CoRK4gsQaUm6'
         }
       })
