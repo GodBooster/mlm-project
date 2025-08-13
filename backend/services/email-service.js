@@ -4,22 +4,22 @@ import nodemailer from 'nodemailer'
 class EmailService {
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.eu.mailgun.org',
+      host: process.env.SMTP_HOST || '162.244.24.181',
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false, // false для 587, true для 465
       auth: {
-        user: process.env.SMTP_USER || 'margine-space@mg.margine-space.com',
-        pass: process.env.SMTP_PASS || '45c21d77a43cff56e850a391cd9ede9b-45de04af-94595f87'
+        user: process.env.SMTP_USER || 'mlmuser@margine-space.com',
+        pass: process.env.SMTP_PASS || 'CoRK4gsQaUm6'
       },
       tls: {
         rejectUnauthorized: false,
-        ciphers: 'SSLv3'
+        ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256'
       },
       connectionTimeout: 60000,
       greetingTimeout: 30000,
       socketTimeout: 60000,
-      debug: false, // <-- это включает логи
-      logger: false // <-- это включает debug-логи
+      debug: false,
+      logger: false
     })
   }
 
@@ -49,12 +49,12 @@ class EmailService {
    // Альтернативный метод через другой SMTP порт
    async sendEmailAlternative(to, subject, html, text = null) {
     const alternativeTransporter = nodemailer.createTransport({
-      host: 'smtp.eu.mailgun.org',
+      host: 'mail.margine-space.com',
       port: 465, // SSL порт
       secure: true,
       auth: {
-        user: 'margine-space@mg.margine-space.com',
-        pass: '45c21d77a43cff56e850a391cd9ede9b-45de04af-94595f87'
+        user: 'mlmuser@margine-space.com',
+        pass: 'CoRK4gsQaUm6'
       },
       tls: {
         rejectUnauthorized: false
@@ -715,7 +715,7 @@ class EmailService {
 // Проверка соединения с детальной диагностикой
 async verifyConnection() {
   try {
-    console.log('[EMAIL] Testing SMTP connection to smtp.eu.mailgun.org:587...')
+    console.log('[EMAIL] Testing SMTP connection to mail.margine-space.com:587...')
     await this.transporter.verify()
     console.log('[EMAIL] ✅ SMTP connection verified successfully')
     return true
@@ -726,12 +726,12 @@ async verifyConnection() {
     try {
       console.log('[EMAIL] Testing alternative SMTP connection on port 465...')
       const altTransporter = nodemailer.createTransport({
-        host: 'smtp.eu.mailgun.org',
+        host: 'mail.margine-space.com',
         port: 465,
         secure: true,
         auth: {
-          user: 'margine-space@mg.margine-space.com',
-          pass: '45c21d77a43cff56e850a391cd9ede9b-45de04af-94595f87'
+          user: 'mlmuser@margine-space.com',
+          pass: 'CoRK4gsQaUm6'
         }
       })
       

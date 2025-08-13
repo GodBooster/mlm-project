@@ -170,12 +170,15 @@ app.get('/invite/:code', (req, res) => {
 async function sendVerificationEmail(to, code, token) {
   // Настройка транспорта
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true,
+    host: process.env.SMTP_HOST || '162.244.24.181',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
+      user: process.env.SMTP_USER || 'mlmuser@margine-space.com',
+      pass: process.env.SMTP_PASS || 'CoRK4gsQaUm6'
+    },
+    tls: {
+      rejectUnauthorized: false
     }
   });
 
@@ -439,11 +442,11 @@ async function sendVerificationEmail(to, code, token) {
   `;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || 'MLM Transgresse <no-reply@mlm.transgresse.com>',
+    from: process.env.SMTP_FROM_EMAIL || 'Margine Space <noreply@margine-space.com>',
     to,
-    subject: 'Email Verification — MLM Transgresse',
+            subject: 'Email Verification — Margine Space',
     html,
-    text: `Thank you for registering on MLM Transgresse!\n\nTo verify your email, use this code: ${code}\n\nIf you did not register, simply ignore this email.\n\nBest regards,\nThe MLM Transgresse Team`,
+            text: `Thank you for registering on Margine Space!\n\nTo verify your email, use this code: ${code}\n\nIf you did not register, simply ignore this email.\n\nBest regards,\nThe Margine Space Team`,
   };
 
   // Отправка письма
@@ -558,10 +561,10 @@ app.post('/api/register', async (req, res) => {
         userData: { email, name: userName, password, referralId }
       })
 
-      // Синхронная отправка email через Mailgun
+      // Синхронная отправка email через Contabo SMTP
       try {
         await emailService.sendVerificationEmail(email, verificationCode, verificationToken);
-        console.log(`|mlm-backend  | [EMAIL] MAILGUN SENT TO: ${email} | CODE: ${verificationCode}`);
+        console.log(`|mlm-backend  | [EMAIL] CONTRABO SMTP SENT TO: ${email} | CODE: ${verificationCode}`);
       } catch (emailError) {
         console.error(`❌ Email sending failed: ${emailError.message}`);
         // Даже если email не отправился, возвращаем успех
@@ -664,7 +667,7 @@ app.post('/api/reset-password', async (req, res) => {
       // Fallback к синхронной отправке если очереди недоступны
       console.log(`⚠️ Queue error: ${queueError.message}, sending password reset email synchronously`);
       await emailService.sendPasswordResetEmail(email, resetToken);
-      console.log(`|mlm-backend  | [EMAIL] MAILGUN SENT TO: ${email} | CODE: ${resetToken}`);
+              console.log(`|mlm-backend  | [EMAIL] CONTRABO SMTP SENT TO: ${email} | CODE: ${resetToken}`);
     }
     
     res.json({ 
