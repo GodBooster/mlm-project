@@ -24,7 +24,13 @@ import QRCode from 'qrcode'
 
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || '4e457cd42a35e06819639dfdf690f6e0bca269908a2482b8f93badde0b5e93e0162bdfaec4bf3f35b5072f202a46cde06417cec5398a61249cbfb3161477427c'
+const JWT_SECRET = process.env.JWT_SECRET
+
+if (!JWT_SECRET) {
+  console.error('❌ CRITICAL: JWT_SECRET environment variable is not set!');
+  console.error('❌ Please set JWT_SECRET in your .env file');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],

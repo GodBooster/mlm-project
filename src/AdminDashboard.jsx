@@ -1105,9 +1105,9 @@ export default function AdminDashboard() {
               
               {!showTwoFactorSetup && !showDisable2FA ? (
                 <div className="text-center py-8">
-                  <div className="mb-6">
-                    <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Settings size={32} className="text-orange-400" />
+                  <div className="mb-8">
+                    <div className={`w-16 h-16 ${twoFactorEnabled ? 'bg-green-500/20' : 'bg-orange-500/20'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                      <Settings size={32} className={twoFactorEnabled ? 'text-green-400' : 'text-orange-400'} />
                     </div>
                     <h4 className="text-xl font-semibold text-white mb-2">
                       {twoFactorEnabled ? '2FA Protection Active' : 'Enable 2FA Protection'}
@@ -1120,25 +1120,40 @@ export default function AdminDashboard() {
                     </p>
                     
                     {twoFactorEnabled && (
-                      <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
-                        <div className="flex items-center justify-center gap-2 text-green-400">
+                      <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+                        <div className="flex items-center justify-center gap-2 text-green-400 mb-2">
                           <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                          <span className="text-sm font-medium">2FA is enabled</span>
+                          <span className="text-sm font-medium">Security Status: Active</span>
                         </div>
+                        <p className="text-gray-300 text-sm">
+                          Two-factor authentication is protecting your account. You can disable it if needed.
+                        </p>
                       </div>
                     )}
                   </div>
                   
                   {twoFactorEnabled ? (
                     <button
-                      onClick={() => setShowDisable2FA(true)}
+                      onClick={() => {
+                        setShowDisable2FA(true);
+                        setShowTwoFactorSetup(false);
+                        setTwoFactorSecret('');
+                        setTwoFactorQrCode('');
+                        setSetupVerificationCode('');
+                        setSetupError('');
+                      }}
                       className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                     >
                       Disable 2FA
                     </button>
                   ) : (
                     <button
-                      onClick={handleSetupTwoFactor}
+                      onClick={() => {
+                        handleSetupTwoFactor();
+                        setShowDisable2FA(false);
+                        setDisablePassword('');
+                        setDisableError('');
+                      }}
                       className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                       disabled={settingUpTwoFactor}
                     >
@@ -1150,7 +1165,7 @@ export default function AdminDashboard() {
                     <div className="mt-4 text-red-400 text-sm">{setupError}</div>
                   )}
                 </div>
-              ) : (
+              ) : showTwoFactorSetup ? (
                 <div className="max-w-md mx-auto">
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-white mb-4">Step 1: Scan QR Code</h4>
@@ -1213,52 +1228,71 @@ export default function AdminDashboard() {
                     </form>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Disable 2FA Form */}
               {showDisable2FA && (
                 <div className="max-w-md mx-auto">
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-white mb-4">Disable 2FA Protection</h4>
-                    <p className="text-gray-300 mb-4">Enter your password to disable two-factor authentication:</p>
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Settings size={32} className="text-red-400" />
+                    </div>
+                    <h4 className="text-xl font-semibold text-white mb-2">Disable 2FA Protection</h4>
+                    <p className="text-gray-300 mb-6">This will remove the extra security layer from your account</p>
                     
-                    <form onSubmit={handleDisable2FA} className="space-y-4">
+                    <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 text-red-400 mb-2">
+                        <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                        <span className="text-sm font-medium">Security Warning</span>
+                      </div>
+                      <p className="text-gray-300 text-sm">
+                        Disabling 2FA will make your account less secure. Make sure this is what you want to do.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <form onSubmit={handleDisable2FA} className="space-y-4">
+                    <div>
+                      <label className="block text-gray-300 mb-2 text-sm font-medium">Confirm Password</label>
                       <input
                         type="password"
                         className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-red-500 focus:outline-none"
                         value={disablePassword}
                         onChange={e => setDisablePassword(e.target.value)}
-                        placeholder="Enter your password"
+                        placeholder="Enter your current password"
                         required
                       />
-                      
-                      {disableError && (
+                      <p className="text-gray-400 text-xs mt-1">Enter your password to confirm this action</p>
+                    </div>
+                    
+                    {disableError && (
+                      <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
                         <div className="text-red-400 text-sm">{disableError}</div>
-                      )}
-                      
-                      <div className="flex gap-3">
-                        <button
-                          type="submit"
-                          className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
-                          disabled={disabling2FA}
-                        >
-                          {disabling2FA ? 'Disabling...' : 'Disable 2FA'}
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowDisable2FA(false);
-                            setDisablePassword('');
-                            setDisableError('');
-                          }}
-                          className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
-                        >
-                          Cancel
-                        </button>
                       </div>
-                    </form>
-                  </div>
+                    )}
+                    
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="submit"
+                        className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+                        disabled={disabling2FA}
+                      >
+                        {disabling2FA ? 'Disabling...' : 'Disable 2FA'}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDisable2FA(false);
+                          setDisablePassword('');
+                          setDisableError('');
+                        }}
+                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
                 </div>
               )}
             </Card>
