@@ -118,6 +118,20 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 
+// Настройка CORS для продакшена
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://margine-space.com');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // Настройка сессий для 2FA
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-super-secret-session-key-change-this-in-production',
@@ -127,7 +141,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // true для HTTPS в продакшене
     maxAge: 30 * 60 * 1000, // 30 минут
     httpOnly: true,
-    sameSite: 'strict'
+    sameSite: 'lax' // lax для лучшей совместимости
   }
 }));
 
