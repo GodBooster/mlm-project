@@ -21,7 +21,7 @@ import { startCleanupScheduler } from './jobs/cleanup-pending-registrations.js'
 import rateLimit from 'express-rate-limit'
 import speakeasy from 'speakeasy'
 import QRCode from 'qrcode'
-import session from 'express-session'
+
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || '4e457cd42a35e06819639dfdf690f6e0bca269908a2482b8f93badde0b5e93e0162bdfaec4bf3f35b5072f202a46cde06417cec5398a61249cbfb3161477427c'
@@ -145,18 +145,7 @@ app.use((req, res, next) => {
   }
 });
 
-// Настройка сессий для 2FA
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-super-secret-session-key-change-this-in-production',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === 'production', // true для HTTPS в продакшене
-    maxAge: 30 * 60 * 1000, // 30 минут
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'none' // none для локальной разработки
-  }
-}));
+
 
 // Логирование всех запросов
 app.use((req, res, next) => {
