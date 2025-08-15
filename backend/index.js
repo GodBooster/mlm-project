@@ -2616,8 +2616,68 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'Invalid user id' });
     }
-    await prisma.user.delete({ where: { id: userId } });
-    res.json({ success: true });
+    
+    // Проверяем, есть ли связанные данные
+    const userWithData = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        transactions: true,
+        investments: true,
+        referrals: true,
+        defiPositions: true
+      }
+    });
+    
+    if (!userWithData) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Проверяем, есть ли активные инвестиции
+    const activeInvestments = userWithData.investments.filter(inv => inv.isActive);
+    if (activeInvestments.length > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete user with ${activeInvestments.length} active investments. Please close investments first.` 
+      });
+    }
+    
+    // Проверяем, есть ли незавершенные транзакции
+    const pendingTransactions = userWithData.transactions.filter(tx => tx.status === 'PENDING');
+    if (pendingTransactions.length > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete user with ${pendingTransactions.length} pending transactions. Please process transactions first.` 
+      });
+    }
+    
+    // Удаляем пользователя с каскадным удалением связанных данных
+    await prisma.$transaction(async (tx) => {
+      // Удаляем транзакции
+      await tx.transaction.deleteMany({
+        where: { userId }
+      });
+      
+      // Удаляем инвестиции
+      await tx.investment.deleteMany({
+        where: { userId }
+      });
+      
+      // Удаляем DeFi позиции
+      await tx.defiPosition.deleteMany({
+        where: { userId }
+      });
+      
+      // Обновляем рефералов (убираем ссылку на удаляемого пользователя)
+      await tx.user.updateMany({
+        where: { referredBy: userWithData.referralCode },
+        data: { referredBy: null }
+      });
+      
+      // Удаляем самого пользователя
+      await tx.user.delete({
+        where: { id: userId }
+      });
+    });
+    
+    res.json({ success: true, message: 'User and all related data deleted successfully' });
   } catch (error) {
     console.error('Admin delete user error:', error);
     res.status(500).json({ error: 'Failed to delete user' });
