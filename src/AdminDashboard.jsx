@@ -22,6 +22,20 @@ export default function AdminDashboard() {
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   
+  // 2FA states
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [twoFactorToken, setTwoFactorToken] = useState('');
+  const [twoFactorError, setTwoFactorError] = useState('');
+  const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false);
+  
+  // 2FA setup states
+  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
+  const [twoFactorSecret, setTwoFactorSecret] = useState('');
+  const [twoFactorQrCode, setTwoFactorQrCode] = useState('');
+  const [setupVerificationCode, setSetupVerificationCode] = useState('');
+  const [setupError, setSetupError] = useState('');
+  const [settingUpTwoFactor, setSettingUpTwoFactor] = useState(false);
+  
   // State for editing packages
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPackage, setEditingPackage] = useState(null);
@@ -306,18 +320,24 @@ export default function AdminDashboard() {
     e.preventDefault();
     setLoggingIn(true);
     setLoginError('');
+    setTwoFactorError('');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginForm)
       });
       const data = await res.json();
-      if (res.ok && data.user?.isAdmin) {
-        setToken(data.token);
-        localStorage.setItem('adminToken', data.token);
-      } else if (res.ok) {
-        setLoginError('Not an admin account');
+      
+      if (res.ok) {
+        if (data.requiresTwoFactor) {
+          // Нужен 2FA код
+          setRequiresTwoFactor(true);
+        } else {
+          // 2FA не требуется, сразу логиним
+          setToken(data.token);
+          localStorage.setItem('adminToken', data.token);
+        }
       } else {
         setLoginError(data.error || 'Login failed');
       }
@@ -358,6 +378,97 @@ export default function AdminDashboard() {
     setLoadingProfile(false);
   };
 
+  const handleVerifyTwoFactor = async (e) => {
+    e.preventDefault();
+    setVerifyingTwoFactor(true);
+    setTwoFactorError('');
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/verify-2fa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: twoFactorToken })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setToken(data.token);
+        localStorage.setItem('adminToken', data.token);
+        setRequiresTwoFactor(false);
+        setTwoFactorToken('');
+      } else {
+        setTwoFactorError(data.error || 'Invalid verification code');
+      }
+    } catch {
+      setTwoFactorError('Network error');
+    }
+    
+    setVerifyingTwoFactor(false);
+  };
+
+  const handleSetupTwoFactor = async () => {
+    setSettingUpTwoFactor(true);
+    setSetupError('');
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/setup-2fa`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setTwoFactorSecret(data.secret);
+        setTwoFactorQrCode(data.qrCode);
+        setShowTwoFactorSetup(true);
+      } else {
+        setSetupError(data.error || 'Failed to setup 2FA');
+      }
+    } catch {
+      setSetupError('Network error');
+    }
+    
+    setSettingUpTwoFactor(false);
+  };
+
+  const handleVerifyTwoFactorSetup = async (e) => {
+    e.preventDefault();
+    setSettingUpTwoFactor(true);
+    setSetupError('');
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/verify-2fa-setup`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ token: setupVerificationCode })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setShowTwoFactorSetup(false);
+        setTwoFactorSecret('');
+        setTwoFactorQrCode('');
+        setSetupVerificationCode('');
+        alert('2FA successfully enabled!');
+      } else {
+        setSetupError(data.error || 'Invalid verification code');
+      }
+    } catch {
+      setSetupError('Network error');
+    }
+    
+    setSettingUpTwoFactor(false);
+  };
+
   const handleShowHistory = async (user) => {
     setHistoryUser(user);
     setShowHistoryModal(true);
@@ -382,6 +493,7 @@ export default function AdminDashboard() {
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'transactions', icon: Package, label: 'Transactions' },
     { id: 'packages', icon: Settings, label: 'Packages' },
+    { id: '2fa', icon: Settings, label: '2FA Setup' },
     { id: 'logout', icon: LogOut, label: 'Logout' }
   ];
 
@@ -460,37 +572,79 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-900/20 via-gray-900 to-black flex items-center justify-center">
         <Card className="w-full max-w-md">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">Admin Login</h2>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-gray-300 mb-1">Email</label>
-              <input
-                type="email"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                value={loginForm.email}
-                onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-gray-300 mb-1">Password</label>
-              <input
-                type="password"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                value={loginForm.password}
-                onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
-                required
-              />
-            </div>
-            {loginError && <div className="text-red-400 text-sm">{loginError}</div>}
-            <button
-              type="submit"
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-colors"
-              disabled={loggingIn}
-            >
-              {loggingIn ? 'Logging in...' : 'Login as Admin'}
-            </button>
-          </form>
+          {!requiresTwoFactor ? (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-6 text-center">Admin Login</h2>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-gray-300 mb-1">Email</label>
+                  <input
+                    type="email"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                    value={loginForm.email}
+                    onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 mb-1">Password</label>
+                  <input
+                    type="password"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
+                    value={loginForm.password}
+                    onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
+                    required
+                  />
+                </div>
+                {loginError && <div className="text-red-400 text-sm">{loginError}</div>}
+                <button
+                  type="submit"
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-colors"
+                  disabled={loggingIn}
+                >
+                  {loggingIn ? 'Logging in...' : 'Login as Admin'}
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-6 text-center">Two-Factor Authentication</h2>
+              <p className="text-gray-300 mb-4 text-center">Enter the 6-digit code from your Google Authenticator app</p>
+              <form onSubmit={handleVerifyTwoFactor} className="space-y-4">
+                <div>
+                  <label className="block text-gray-300 mb-1">Verification Code</label>
+                  <input
+                    type="text"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none text-center text-lg tracking-widest"
+                    value={twoFactorToken}
+                    onChange={e => setTwoFactorToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    maxLength={6}
+                    required
+                  />
+                </div>
+                {twoFactorError && <div className="text-red-400 text-sm">{twoFactorError}</div>}
+                <button
+                  type="submit"
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-colors"
+                  disabled={verifyingTwoFactor}
+                >
+                  {verifyingTwoFactor ? 'Verifying...' : 'Verify Code'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequiresTwoFactor(false);
+                    setTwoFactorToken('');
+                    setTwoFactorError('');
+                  }}
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 rounded-lg transition-colors"
+                >
+                  Back to Login
+                </button>
+              </form>
+            </>
+          )}
         </Card>
       </div>
     );
@@ -871,6 +1025,103 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </Card>
+          )}
+
+          {/* 2FA Setup */}
+          {currentPage === '2fa' && (
+            <Card>
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-white">Two-Factor Authentication Setup</h3>
+                <p className="text-gray-300 opacity-70 text-sm">Secure your admin account with Google Authenticator</p>
+              </div>
+              
+              {!showTwoFactorSetup ? (
+                <div className="text-center py-8">
+                  <div className="mb-6">
+                    <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Settings size={32} className="text-orange-400" />
+                    </div>
+                    <h4 className="text-xl font-semibold text-white mb-2">Enable 2FA Protection</h4>
+                    <p className="text-gray-300 mb-6">Add an extra layer of security to your admin account</p>
+                  </div>
+                  
+                  <button
+                    onClick={handleSetupTwoFactor}
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    disabled={settingUpTwoFactor}
+                  >
+                    {settingUpTwoFactor ? 'Setting up...' : 'Setup 2FA'}
+                  </button>
+                  
+                  {setupError && (
+                    <div className="mt-4 text-red-400 text-sm">{setupError}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="max-w-md mx-auto">
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-white mb-4">Step 1: Scan QR Code</h4>
+                    <p className="text-gray-300 mb-4">Open Google Authenticator and scan this QR code:</p>
+                    
+                    <div className="bg-white p-4 rounded-lg inline-block mb-4">
+                      <img src={twoFactorQrCode} alt="2FA QR Code" className="w-48 h-48" />
+                    </div>
+                    
+                    <div className="mb-4">
+                      <p className="text-gray-300 text-sm mb-2">Or enter this code manually:</p>
+                      <div className="bg-gray-800 p-3 rounded-lg">
+                        <code className="text-orange-400 font-mono text-sm break-all">{twoFactorSecret}</code>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-white mb-4">Step 2: Verify Setup</h4>
+                    <p className="text-gray-300 mb-4">Enter the 6-digit code from your Google Authenticator app:</p>
+                    
+                    <form onSubmit={handleVerifyTwoFactorSetup} className="space-y-4">
+                      <input
+                        type="text"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-orange-500 focus:outline-none text-center text-lg tracking-widest"
+                        value={setupVerificationCode}
+                        onChange={e => setSetupVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        maxLength={6}
+                        required
+                      />
+                      
+                      {setupError && (
+                        <div className="text-red-400 text-sm">{setupError}</div>
+                      )}
+                      
+                      <div className="flex gap-3">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
+                          disabled={settingUpTwoFactor}
+                        >
+                          {settingUpTwoFactor ? 'Verifying...' : 'Verify & Enable'}
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowTwoFactorSetup(false);
+                            setTwoFactorSecret('');
+                            setTwoFactorQrCode('');
+                            setSetupVerificationCode('');
+                            setSetupError('');
+                          }}
+                          className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>
