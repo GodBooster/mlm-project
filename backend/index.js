@@ -18,6 +18,7 @@ import emailService from './services/email-service.js'
 import queueService from './services/queueService.js'
 import systemUpdater from './system-updater.js'
 import { startCleanupScheduler } from './jobs/cleanup-pending-registrations.js'
+import rateLimit from 'express-rate-limit'
 
 const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
@@ -57,6 +58,68 @@ process.on('SIGTERM', async () => {
 });
 
 const app = express()
+
+// Rate Limiting Configuration
+// Лимит для логина: 20 попыток в минуту с одного IP
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 минута
+  max: 20, // 20 попыток
+  message: { 
+    error: 'Too many login attempts from this IP, please try again later',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    // Используем IP адрес для идентификации
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
+  }
+})
+
+// Лимит для регистрации: 10 попыток в час с одного IP
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 час
+  max: 10, // 10 попыток
+  message: { 
+    error: 'Too many registration attempts from this IP, please try again later',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
+  }
+})
+
+// Лимит для API запросов: 100 запросов в час с одного IP (исключая системные IP)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 час
+  max: 100, // 100 запросов
+  message: { 
+    error: 'Too many requests from this IP, please try again later',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  skip: (req) => {
+    // Пропускаем системные IP и IP проекта
+    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
+    const systemIPs = [
+      '127.0.0.1', 'localhost', '::1', // localhost
+      '49.13.212.207', // ваш сервер
+      '138.199.150.49', // база данных
+      '162.244.24.181' // SMTP сервер
+    ]
+    return systemIPs.includes(clientIP)
+  },
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
+  }
+})
+
 app.use(express.json());
 
 // Логирование всех запросов
@@ -110,6 +173,16 @@ systemUpdater.start().catch(console.error)
 
 // Start cleanup scheduler for pending registrations
 startCleanupScheduler()
+
+// Apply API rate limiting to all API routes (except health check and static files)
+app.use('/api', (req, res, next) => {
+  // Пропускаем health check
+  if (req.path === '/health') {
+    return next();
+  }
+  // Применяем API лимитер к остальным API routes
+  apiLimiter(req, res, next);
+});
 
 // Middleware для обработки ошибок Prisma (упрощенная версия)
 app.use((error, req, res, next) => {
@@ -466,7 +539,7 @@ async function sendVerificationEmail(to, code, token) {
 }
 
 // Authentication routes
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', registerLimiter, async (req, res) => {
   try {
     const { email, name, username, password, referralId } = req.body
     
@@ -597,7 +670,7 @@ app.post('/api/register', async (req, res) => {
   }
 })
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body
 
