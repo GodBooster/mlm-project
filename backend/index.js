@@ -1188,7 +1188,7 @@ app.post('/api/wallet', authenticateToken, async (req, res) => {
 })
 
 // Generate deposit address using merchant API
-app.post('/api/deposit/generate-address', authenticateToken, requireEmailVerification, async (req, res) => {
+app.post('/api/deposit/generate-address', authenticateToken, async (req, res) => {
   try {
     const { network = 'BSC' } = req.body
     const userId = req.user.id
@@ -1330,7 +1330,7 @@ app.post('/api/deposit', authenticateToken, async (req, res) => {
   }
 })
 
-app.post('/api/withdraw', authenticateToken, requireEmailVerification, async (req, res) => {
+app.post('/api/withdraw', authenticateToken, async (req, res) => {
   try {
     const { amount, wallet } = req.body
     const userId = req.user.id
@@ -1505,7 +1505,7 @@ app.get('/api/referral-stats', authenticateToken, async (req, res) => {
 })
 
 // Investment routes
-app.post('/api/investments', authenticateToken, requireEmailVerification, async (req, res) => {
+app.post('/api/investments', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id
     const { packageId, amount } = req.body
