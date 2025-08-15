@@ -1105,10 +1105,8 @@ app.post('/api/admin/verify-2fa', async (req, res) => {
     if (verified) {
       // Успешная аутентификация
       const jwtToken = generateToken(user);
-      req.session.adminUser = user.id;
-      delete req.session.pendingAdminUser;
 
-    res.json({
+      res.json({
       success: true,
         message: 'Welcome to admin panel!',
         token: jwtToken,
@@ -1170,12 +1168,8 @@ app.post('/api/admin/disable-2fa', authenticateToken, async (req, res) => {
 
 // Выход из админки
 app.post('/api/admin/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Logout failed' });
-    }
-    res.json({ success: true, message: 'Logged out successfully' });
-  });
+  // JWT токены не требуют серверного logout - клиент просто удаляет токен
+  res.json({ success: true, message: 'Logged out successfully' });
 });
 
 app.post('/api/resend-verification', async (req, res) => {
