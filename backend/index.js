@@ -22,6 +22,7 @@ import rateLimit from 'express-rate-limit'
 import speakeasy from 'speakeasy'
 import QRCode from 'qrcode'
 import session from 'express-session'
+import jwt from 'jsonwebtoken'
 
 const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
@@ -118,9 +119,19 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 
-// Настройка CORS для продакшена
+// Настройка CORS для локальной разработки и продакшена
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://margine-space.com');
+  const allowedOrigins = [
+    'https://margine-space.com',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -141,7 +152,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // true для HTTPS в продакшене
     maxAge: 30 * 60 * 1000, // 30 минут
     httpOnly: true,
-    sameSite: 'lax' // lax для лучшей совместимости
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'none' // none для локальной разработки
   }
 }));
 
