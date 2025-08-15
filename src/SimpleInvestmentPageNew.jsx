@@ -18,14 +18,21 @@ const SimpleInvestmentPage = ({ userData, packages, onInvest, loading }) => {
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
+      <div className="text-center animate-fade-in-up">
         <h2 className="text-3xl font-bold text-white mb-2">Investment Packages</h2>
         <p className="text-gray-400">Choose from our profitable investment plans</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {packages.map((pkg, index) => (
-          <div key={pkg.id || index} className="glass-card p-6 hover:glass-card-hover transition-all duration-300">
+          <div 
+            key={pkg.id || index} 
+            className="glass-card p-6 hover:glass-card-hover transition-all duration-300 animate-fade-in-up"
+            style={{ 
+              animationDelay: `${index * 0.1}s`,
+              animationFillMode: 'both'
+            }}
+          >
             {/* Package Header */}
             <div className="text-center mb-4">
               <h3 className="text-xl font-bold text-white mb-2">{pkg.name}</h3>
@@ -90,7 +97,7 @@ const SimpleInvestmentPage = ({ userData, packages, onInvest, loading }) => {
       </div>
 
       {/* Balance Display */}
-      <div className="text-center p-4 glass-card">
+      <div className="text-center p-4 glass-card animate-fade-in-up" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
         <div className="text-gray-400 text-sm">Your Current Balance</div>
         <div className="text-white text-2xl font-bold">
           ${userData?.balance?.toLocaleString() || '0.00'}

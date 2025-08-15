@@ -25,15 +25,22 @@ const SimpleInvestmentPage = ({ userData, packages, onInvest, loading }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="text-left mb-8">
+      <div className="text-left mb-8 animate-fade-in-up">
         <h1 className="text-3xl font-bold text-white mb-2">Investment Packages</h1>
         <p className="text-gray-300">Choose your investment package and start earning</p>
       </div>
 
       {/* Packages Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {packages.map((pkg) => (
-          <div key={pkg.id} className="glass-card glass-card-hover p-5 rounded-xl relative overflow-hidden min-h-[280px]">
+        {packages.map((pkg, index) => (
+          <div 
+            key={pkg.id} 
+            className="glass-card glass-card-hover p-5 rounded-xl relative overflow-hidden min-h-[280px] animate-fade-in-up"
+            style={{ 
+              animationDelay: `${index * 0.1}s`,
+              animationFillMode: 'both'
+            }}
+          >
             {/* Background Image - Right Half */}
             {pkg.name && (
               <div className="absolute top-0 right-0 w-1/2 h-full opacity-25 flex items-center justify-center">

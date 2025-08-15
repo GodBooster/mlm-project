@@ -97,14 +97,265 @@
 .glass-input:focus {
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.04) 3%,
+    rgba(249, 115, 22, 0.08) 0%,
+    rgba(249, 115, 22, 0.04) 3%,
     rgba(255, 255, 255, 0.01) 100%
   );
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(249, 115, 22, 0.4);
   box-shadow: 
-    0 0 0 3px rgba(255, 255, 255, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 0 0 3px rgba(249, 115, 22, 0.15),
+    inset 0 1px 0 rgba(249, 115, 22, 0.1);
+}
+
+/* Стили для селектора и его опций */
+.glass-input select {
+  background: inherit;
+  color: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(249,115,22)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px !important;
+}
+
+.glass-input select:focus {
+  outline: none;
+}
+
+/* Улучшенные стили для option элементов */
+.glass-input select option {
+  background-color: rgba(30, 30, 30, 0.95) !important;
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: #ffffff !important;
+  padding: 12px 16px !important;
+  border: none !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.glass-input select option:hover,
+.glass-input select option:focus,
+.glass-input select option:checked,
+.glass-input select option:active {
+  background-color: rgba(249, 115, 22, 0.8) !important;
+  background: rgba(249, 115, 22, 0.8) !important;
+  color: #ffffff !important;
+}
+
+.glass-input select option:selected {
+  background-color: rgba(249, 115, 22, 0.9) !important;
+  background: rgba(249, 115, 22, 0.9) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* Принудительное переопределение системных стилей */
+.glass-input select option[selected] {
+  background-color: rgba(249, 115, 22, 0.9) !important;
+  background: rgba(249, 115, 22, 0.9) !important;
+  color: #ffffff !important;
+}
+
+.glass-input select option::selection {
+  background-color: rgba(249, 115, 22, 0.9) !important;
+  background: rgba(249, 115, 22, 0.9) !important;
+  color: #ffffff !important;
+}
+
+/* Дополнительные стили для кроссбраузерности */
+@supports (-webkit-appearance: none) {
+  .glass-input select option {
+    background: rgba(30, 30, 30, 0.95) !important;
+    color: #ffffff !important;
+  }
+  
+  .glass-input select option:checked {
+    background: rgba(249, 115, 22, 0.9) !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Специальные стили для WebKit браузеров (Chrome, Safari, Edge) */
+.glass-input select::-webkit-dropdown-menu {
+  background-color: rgba(30, 30, 30, 0.95) !important;
+}
+
+.glass-input select::-webkit-dropdown-option {
+  background-color: rgba(30, 30, 30, 0.95) !important;
+  color: #ffffff !important;
+}
+
+.glass-input select::-webkit-dropdown-option:hover,
+.glass-input select::-webkit-dropdown-option:checked,
+.glass-input select::-webkit-dropdown-option:focus {
+  background-color: rgba(249, 115, 22, 0.9) !important;
+  background: rgba(249, 115, 22, 0.9) !important;
+  color: #ffffff !important;
+}
+
+/* Переопределение системных highlight цветов */
+.glass-input select {
+  accent-color: rgb(249, 115, 22) !important;
+}
+
+/* Принудительные стили через CSS переменные */
+.glass-input select option {
+  --option-bg: rgba(30, 30, 30, 0.95);
+  --option-selected-bg: rgba(249, 115, 22, 0.9);
+  --option-color: #ffffff;
+  
+  background: var(--option-bg) !important;
+  color: var(--option-color) !important;
+}
+
+.glass-input select option:checked,
+.glass-input select option:hover,
+.glass-input select option:focus,
+.glass-input select option[selected] {
+  background: var(--option-selected-bg) !important;
+  color: var(--option-color) !important;
+}
+
+/* Стили для темной темы браузера */
+@media (prefers-color-scheme: dark) {
+  .glass-input select option {
+    background-color: rgba(20, 20, 20, 0.98) !important;
+    color: #ffffff !important;
+  }
+  
+  .glass-input select option:hover,
+  .glass-input select option:focus,
+  .glass-input select option:checked {
+    background-color: rgba(249, 115, 22, 0.25) !important;
+    color: rgb(249, 115, 22) !important;
+  }
+}
+
+/* Стили для светлой темы браузера */
+@media (prefers-color-scheme: light) {
+  .glass-input select option {
+    background-color: rgba(40, 40, 40, 0.95) !important;
+    color: #ffffff !important;
+  }
+  
+  .glass-input select option:hover,
+  .glass-input select option:focus,
+  .glass-input select option:checked {
+    background-color: rgba(249, 115, 22, 0.9) !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Специальный класс для принудительного переопределения */
+.orange-select-override {
+  /* Принудительно переопределяем системные цвета */
+  color-scheme: dark !important;
+}
+
+.orange-select-override option {
+  background: rgba(30, 30, 30, 0.98) !important;
+  background-color: rgba(30, 30, 30, 0.98) !important;
+  color: #ffffff !important;
+}
+
+.orange-select-override option:checked,
+.orange-select-override option:hover,
+.orange-select-override option:focus,
+.orange-select-override option:active,
+.orange-select-override option[selected] {
+  background: rgba(249, 115, 22, 0.95) !important;
+  background-color: rgba(249, 115, 22, 0.95) !important;
+  color: #ffffff !important;
+}
+
+/* Для браузеров на движке Blink (Chrome, Edge) */
+@supports (-webkit-appearance: menulist) {
+  .orange-select-override option:checked {
+    background: linear-gradient(rgba(249, 115, 22, 0.95), rgba(249, 115, 22, 0.95)) !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Для Firefox */
+@-moz-document url-prefix() {
+  .orange-select-override option:checked {
+    background-color: rgba(249, 115, 22, 0.95) !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Стили для кастомного селектора */
+.shadow-orange-glow {
+  box-shadow: 
+    0 0 0 3px rgba(249, 115, 22, 0.15),
+    0 4px 12px rgba(249, 115, 22, 0.1),
+    inset 0 1px 0 rgba(249, 115, 22, 0.1);
+}
+
+/* Анимации для кастомного селектора */
+.custom-select-enter {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+}
+
+.custom-select-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 0.2s ease-out;
+}
+
+.custom-select-exit {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.custom-select-exit-active {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+  transition: all 0.15s ease-in;
+}
+
+/* Кастомный скроллбар для таблиц */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(249, 115, 22, 0.5) rgba(255, 255, 255, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    135deg,
+    rgba(249, 115, 22, 0.6) 0%,
+    rgba(249, 115, 22, 0.8) 50%,
+    rgba(249, 115, 22, 0.6) 100%
+  );
+  border-radius: 4px;
+  border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(249, 115, 22, 0.8) 0%,
+    rgba(249, 115, 22, 1) 50%,
+    rgba(249, 115, 22, 0.8) 100%
+  );
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .glass-button {

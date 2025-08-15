@@ -1010,7 +1010,7 @@ const InvestorDashboard = () => {
                     <p className="text-gray-300 opacity-70 text-sm">View your recent transaction activity</p>
                   </div>
                   <div className="overflow-x-auto">
-                    <div className="max-h-[400px] overflow-y-auto rounded-xl border border-white/10 bg-white/5">
+                    <div className="max-h-[480px] overflow-y-auto rounded-xl border border-white/10 bg-white/5 custom-scrollbar">
                       <table className="min-w-full text-sm">
                         <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
                           <tr>
@@ -1021,7 +1021,7 @@ const InvestorDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.filter(tx => tx.type !== 'Deposit address').map((tx, i) => (
+                      {transactions.filter(tx => tx.type !== 'Deposit address').slice(0, 10).map((tx, i) => (
                             <tr
                               key={i}
                               className={`transition-all duration-200 ${i % 2 === 0 ? 'bg-white/10 hover:bg-cyan-400/10' : 'bg-white/5 hover:bg-cyan-400/15'}`}

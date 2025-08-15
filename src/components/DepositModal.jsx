@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Copy, CheckCircle } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -8,6 +9,12 @@ const DepositModal = ({ isOpen, onClose, token, showSuccess, showError }) => {
   const [depositAddress, setDepositAddress] = useState('');
   const [isGeneratingAddress, setIsGeneratingAddress] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
+
+  // Опции для селектора сети
+  const networkOptions = [
+    { value: 'BSC', label: 'BSC (Binance Smart Chain)' },
+    { value: 'TRX', label: 'TRX (Tron Network)' }
+  ];
 
   // Сброс состояния при закрытии
   const resetState = useCallback(() => {
@@ -76,7 +83,6 @@ const DepositModal = ({ isOpen, onClose, token, showSuccess, showError }) => {
 
   // Обработчик изменения сети
   const handleNetworkChange = useCallback((e) => {
-    e.stopPropagation();
     setSelectedNetwork(e.target.value);
     setDepositAddress(''); // Сбрасываем адрес при смене сети
   }, []);
@@ -115,16 +121,17 @@ const DepositModal = ({ isOpen, onClose, token, showSuccess, showError }) => {
           </div>
           
           <div>
-            <label className="block text-[rgb(249,115,22)] text-sm mb-2">Select Network</label>
-            <select 
-              value={selectedNetwork} 
+            <label className="block text-[rgb(249,115,22)] text-sm mb-2 font-medium">Select Network</label>
+            <CustomSelect
+              value={selectedNetwork}
               onChange={handleNetworkChange}
-              className="w-full glass-input px-4 py-3 text-white focus:outline-none"
+              options={networkOptions}
               disabled={isGeneratingAddress}
-            >
-              <option value="BSC">BSC (Binance Smart Chain)</option>
-              <option value="TRX">TRX (Tron Network)</option>
-            </select>
+              placeholder="Choose blockchain network"
+            />
+            <div className="text-xs text-gray-400 mt-1">
+              Choose the blockchain network for your deposit
+            </div>
           </div>
 
           {!depositAddress ? (

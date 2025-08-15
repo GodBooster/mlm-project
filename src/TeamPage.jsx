@@ -90,9 +90,9 @@ export default function TeamPage({ referralTree, userData, tableView, currentRan
             <h4 className="text-2xl font-bold text-white mb-1">Bonus structure</h4>
             <p className="text-gray-300 opacity-70 text-sm">View your referral bonus levels, conditions, and payout status.</p>
           </div>
-          <div className="overflow-x-auto max-h-[460px] sm:max-h-[calc(100vh-300px)] overflow-y-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm min-w-[200px]">
-              <thead className="sticky top-0 z-10 bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
+              <thead className="bg-gradient-to-r from-cyan-900/90 via-gray-900/90 to-yellow-900/90">
                 <tr>
                   <th className="text-center py-3 px-3 font-semibold text-white uppercase rounded-tl-lg">Lvl</th>
                   <th className="text-center py-3 px-3 font-semibold text-white uppercase">Reward</th>
