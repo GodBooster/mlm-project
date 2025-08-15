@@ -47,6 +47,13 @@ test-results/
 coverage/
 .nyc_output/
 
+# Test files
+test-*.js
+test-*.html
+test-*.jsx
+view-pending-registrations.js
+view-pending.cjs
+
 # Backups and temporary files
 backups/
 *.backup
