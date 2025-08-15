@@ -958,6 +958,12 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     
+    console.log('🔐 [ADMIN_LOGIN] Login attempt:', { 
+      email, 
+      sessionId: req.sessionID,
+      session: req.session 
+    });
+    
     // Находим пользователя
     const user = await prisma.user.findUnique({
       where: { email },
@@ -988,12 +994,19 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
     if (user.twoFactorEnabled) {
       // Сохраняем в сессии, что первый шаг пройден
       req.session.pendingAdminUser = user.id;
+      
+      console.log('🔐 [ADMIN_LOGIN] 2FA required, session set:', { 
+        userId: user.id, 
+        sessionId: req.sessionID,
+        session: req.session 
+      });
+      
       res.json({ 
         success: true, 
         requiresTwoFactor: true,
         message: 'Enter code from Google Authenticator'
       });
-    } else {
+        } else {
       // Если 2FA не настроена, сразу логиним
       const token = generateToken(user);
       req.session.adminUser = user.id;
@@ -1008,8 +1021,8 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
           isAdmin: user.isAdmin
         }
       });
-    }
-  } catch (error) {
+        }
+      } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
@@ -1021,7 +1034,15 @@ app.post('/api/admin/verify-2fa', async (req, res) => {
     const { token } = req.body;
     const userId = req.session.pendingAdminUser;
     
+    console.log('🔐 [2FA] Verify request:', { 
+      token: token ? '***' : 'missing', 
+      userId, 
+      session: req.session,
+      sessionId: req.sessionID 
+    });
+    
     if (!userId) {
+      console.log('❌ [2FA] No pending admin user in session');
       return res.status(400).json({ error: 'Please login with email and password first' });
     }
     
@@ -1058,9 +1079,9 @@ app.post('/api/admin/verify-2fa', async (req, res) => {
       const jwtToken = generateToken(user);
       req.session.adminUser = user.id;
       delete req.session.pendingAdminUser;
-      
-      res.json({ 
-        success: true, 
+
+    res.json({
+      success: true,
         message: 'Welcome to admin panel!',
         token: jwtToken,
         user: {
@@ -1164,7 +1185,7 @@ app.post('/api/resend-verification', async (req, res) => {
       );
 
     res.json({
-      success: true,
+        success: true, 
         message: 'Verification email sent again' 
       });
     } catch (emailError) {
@@ -1197,7 +1218,7 @@ app.post('/api/verify-email', async (req, res) => {
       console.log(`[VERIFY_CODE] ❌ No pending registration found for: ${email}`);
       
       // Проверяем, может пользователь уже есть в основной таблице, но не подтвержден
-      const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findUnique({
         where: { email },
         select: { id: true, emailVerified: true, emailVerificationToken: true }
       });
