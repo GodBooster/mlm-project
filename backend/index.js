@@ -19,6 +19,9 @@ import queueService from './services/queueService.js'
 import systemUpdater from './system-updater.js'
 import { startCleanupScheduler } from './jobs/cleanup-pending-registrations.js'
 import rateLimit from 'express-rate-limit'
+import speakeasy from 'speakeasy'
+import QRCode from 'qrcode'
+import session from 'express-session'
 
 const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
@@ -114,6 +117,19 @@ const apiLimiter = rateLimit({
 })
 
 app.use(express.json());
+
+// Настройка сессий для 2FA
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-super-secret-session-key-change-this-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // true для HTTPS в продакшене
+    maxAge: 30 * 60 * 1000, // 30 минут
+    httpOnly: true,
+    sameSite: 'strict'
+  }
+}));
 
 // Логирование всех запросов
 app.use((req, res, next) => {
@@ -840,6 +856,278 @@ app.post('/api/reset-password-confirm', async (req, res) => {
     res.status(500).json({ error: 'Failed to reset password' })
   }
 })
+
+// ===== 2FA ENDPOINTS =====
+
+// Настройка 2FA для админа
+app.post('/api/admin/setup-2fa', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Проверяем, что пользователь админ
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, isAdmin: true, twoFactorEnabled: true }
+    });
+    
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    if (user.twoFactorEnabled) {
+      return res.status(400).json({ error: '2FA already enabled' });
+    }
+    
+    // Генерируем секретный ключ для 2FA
+    const secret = speakeasy.generateSecret({
+      name: `Margine Space Admin (${user.email})`,
+      issuer: 'Margine Space'
+    });
+    
+    // Сохраняем секрет в базе данных
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: secret.base32 }
+    });
+    
+    // Генерируем QR-код для Google Authenticator
+    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+    
+    res.json({
+      success: true,
+      secret: secret.base32,
+      qrCode: qrCodeUrl,
+      manualEntryKey: secret.base32
+    });
+  } catch (error) {
+    console.error('Setup 2FA error:', error);
+    res.status(500).json({ error: 'Failed to setup 2FA' });
+  }
+});
+
+// Подтверждение настройки 2FA
+app.post('/api/admin/verify-2fa-setup', authenticateToken, async (req, res) => {
+  try {
+    const { token } = req.body;
+    const userId = req.user.id;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, isAdmin: true, twoFactorSecret: true, twoFactorEnabled: true }
+    });
+    
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    if (!user.twoFactorSecret) {
+      return res.status(400).json({ error: '2FA not setup yet' });
+    }
+    
+    if (user.twoFactorEnabled) {
+      return res.status(400).json({ error: '2FA already enabled' });
+    }
+    
+    // Проверяем токен из приложения
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: 'base32',
+      token: token,
+      window: 2 // Допускаем расхождение во времени в 60 секунд
+    });
+    
+    if (verified) {
+      // Активируем 2FA
+      await prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorEnabled: true }
+      });
+      
+      res.json({ success: true, message: '2FA successfully enabled!' });
+    } else {
+      res.status(400).json({ error: 'Invalid verification code' });
+    }
+  } catch (error) {
+    console.error('Verify 2FA setup error:', error);
+    res.status(500).json({ error: 'Failed to verify 2FA setup' });
+  }
+});
+
+// Вход в админку с 2FA (первый шаг - логин/пароль)
+app.post('/api/admin/login', loginLimiter, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Находим пользователя
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { 
+        id: true, 
+        email: true, 
+        password: true, 
+        isAdmin: true, 
+        twoFactorEnabled: true,
+        isBlocked: true
+      }
+    });
+    
+    if (!user || !user.isAdmin) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    if (user.isBlocked) {
+      return res.status(403).json({ error: 'Account is blocked' });
+    }
+    
+    // Проверяем пароль
+    const passwordValid = await bcrypt.compare(password, user.password);
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    if (user.twoFactorEnabled) {
+      // Сохраняем в сессии, что первый шаг пройден
+      req.session.pendingAdminUser = user.id;
+      res.json({ 
+        success: true, 
+        requiresTwoFactor: true,
+        message: 'Enter code from Google Authenticator'
+      });
+    } else {
+      // Если 2FA не настроена, сразу логиним
+      const token = generateToken(user);
+      req.session.adminUser = user.id;
+      
+      res.json({ 
+        success: true, 
+        requiresTwoFactor: false,
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          isAdmin: user.isAdmin
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Второй шаг входа - проверка 2FA кода
+app.post('/api/admin/verify-2fa', async (req, res) => {
+  try {
+    const { token } = req.body;
+    const userId = req.session.pendingAdminUser;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'Please login with email and password first' });
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { 
+        id: true, 
+        email: true, 
+        isAdmin: true, 
+        twoFactorSecret: true, 
+        twoFactorEnabled: true,
+        isBlocked: true
+      }
+    });
+    
+    if (!user || !user.isAdmin || !user.twoFactorEnabled) {
+      return res.status(400).json({ error: 'Authentication error' });
+    }
+    
+    if (user.isBlocked) {
+      return res.status(403).json({ error: 'Account is blocked' });
+    }
+    
+    // Проверяем 2FA токен
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: 'base32',
+      token: token,
+      window: 2
+    });
+    
+    if (verified) {
+      // Успешная аутентификация
+      const jwtToken = generateToken(user);
+      req.session.adminUser = user.id;
+      delete req.session.pendingAdminUser;
+      
+      res.json({ 
+        success: true, 
+        message: 'Welcome to admin panel!',
+        token: jwtToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          isAdmin: user.isAdmin
+        }
+      });
+    } else {
+      res.status(400).json({ error: 'Invalid verification code' });
+    }
+  } catch (error) {
+    console.error('Verify 2FA error:', error);
+    res.status(500).json({ error: 'Failed to verify 2FA' });
+  }
+});
+
+// Отключение 2FA (для экстренных случаев)
+app.post('/api/admin/disable-2fa', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    const userId = req.user.id;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, password: true, isAdmin: true, twoFactorEnabled: true }
+    });
+    
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ error: '2FA is not enabled' });
+    }
+    
+    // Проверяем текущий пароль
+    const passwordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Invalid password' });
+    }
+    
+    // Отключаем 2FA
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        twoFactorEnabled: false,
+        twoFactorSecret: null
+      }
+    });
+    
+    res.json({ success: true, message: '2FA disabled successfully' });
+  } catch (error) {
+    console.error('Disable 2FA error:', error);
+    res.status(500).json({ error: 'Failed to disable 2FA' });
+  }
+});
+
+// Выход из админки
+app.post('/api/admin/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
+});
 
 app.post('/api/resend-verification', async (req, res) => {
   try {
