@@ -54,6 +54,39 @@ test-*.jsx
 view-pending-registrations.js
 view-pending.cjs
 
+# Documentation and markdown files
+*.md
+!README.md
+!DEPLOYMENT.md
+!REPORT_MIGRATION_GUIDE.md
+!SERVER_CHECK.md
+!RANK_REWARDS_OPTIMIZATION.md
+!ASYNC_INVESTMENTS.md
+
+# Test and utility scripts
+check-*.js
+create-test-*.js
+test-*.js
+monitor-*.js
+fix-*.js
+generate-*.js
+diagnose-*.js
+debug-*.js
+
+# Security and configuration files
+fail2ban-*.conf
+nginx-*.conf
+security-report-*.json
+attack-pattern-*.md
+EMERGENCY_SECURITY_ACTIONS.md
+FAIL2BAN_SETUP_INSTRUCTIONS.md
+IP_TRACKING_SETUP.md
+JWT_SECURITY_INSTRUCTIONS.md
+SECURITY_ATTACK_REPORT.md
+SECURITY_INSTRUCTIONS.md
+SECURITY_VULNERABILITY_ANALYSIS.md
+DNS_EMAIL_SETUP.md
+
 # Backups and temporary files
 backups/
 *.backup
