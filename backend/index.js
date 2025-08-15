@@ -70,11 +70,7 @@ const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false,
-  keyGenerator: (req) => {
-    // Используем IP адрес для идентификации
-    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
-  }
+  skipSuccessfulRequests: false
 })
 
 // Лимит для регистрации: 10 попыток в час с одного IP
@@ -87,10 +83,7 @@ const registerLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false,
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
-  }
+  skipSuccessfulRequests: false
 })
 
 // Лимит для API запросов: 100 запросов в час с одного IP (исключая системные IP)
@@ -114,9 +107,6 @@ const apiLimiter = rateLimit({
       '162.244.24.181' // SMTP сервер
     ]
     return systemIPs.includes(clientIP)
-  },
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
   }
 })
 
