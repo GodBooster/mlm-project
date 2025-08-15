@@ -972,11 +972,7 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    console.log('🔐 [ADMIN_LOGIN] Login attempt:', { 
-      email, 
-      sessionId: req.sessionID,
-      session: req.session 
-    });
+    console.log('🔐 [ADMIN_LOGIN] Login attempt:', { email });
     
     // Находим пользователя
     const user = await prisma.user.findUnique({
@@ -1006,24 +1002,30 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
     }
     
     if (user.twoFactorEnabled) {
-      // Сохраняем в сессии, что первый шаг пройден
-      req.session.pendingAdminUser = user.id;
+      // Создаем временный JWT токен для 2FA
+      const tempToken = jwt.sign(
+        { 
+          id: user.id, 
+          email: user.email, 
+          isAdmin: user.isAdmin,
+          temp: true,
+          twoFactorPending: true
+        },
+        JWT_SECRET,
+        { expiresIn: '5m' } // 5 минут на ввод 2FA кода
+      );
       
-      console.log('🔐 [ADMIN_LOGIN] 2FA required, session set:', { 
-        userId: user.id, 
-        sessionId: req.sessionID,
-        session: req.session 
-      });
+      console.log('🔐 [ADMIN_LOGIN] 2FA required, temp token created for user:', user.id);
       
       res.json({ 
         success: true, 
         requiresTwoFactor: true,
+        tempToken,
         message: 'Enter code from Google Authenticator'
       });
-        } else {
+    } else {
       // Если 2FA не настроена, сразу логиним
       const token = generateToken(user);
-      req.session.adminUser = user.id;
       
       res.json({ 
         success: true, 
@@ -1035,8 +1037,8 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
           isAdmin: user.isAdmin
         }
       });
-        }
-      } catch (error) {
+    }
+  } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
@@ -1045,20 +1047,30 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
 // Второй шаг входа - проверка 2FA кода
 app.post('/api/admin/verify-2fa', async (req, res) => {
   try {
-    const { token } = req.body;
-    const userId = req.session.pendingAdminUser;
+    const { token, tempToken } = req.body;
     
     console.log('🔐 [2FA] Verify request:', { 
       token: token ? '***' : 'missing', 
-      userId, 
-      session: req.session,
-      sessionId: req.sessionID 
+      hasTempToken: !!tempToken
     });
     
-    if (!userId) {
-      console.log('❌ [2FA] No pending admin user in session');
+    if (!tempToken) {
       return res.status(400).json({ error: 'Please login with email and password first' });
     }
+    
+    // Проверяем временный токен
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, JWT_SECRET);
+    } catch (error) {
+      return res.status(400).json({ error: 'Login session expired, please login again' });
+    }
+    
+    if (!decoded.twoFactorPending || !decoded.isAdmin) {
+      return res.status(400).json({ error: 'Invalid login session' });
+    }
+    
+    const userId = decoded.id;
     
     const user = await prisma.user.findUnique({
       where: { id: userId },

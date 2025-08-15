@@ -27,6 +27,7 @@ export default function AdminDashboard() {
   const [twoFactorToken, setTwoFactorToken] = useState('');
   const [twoFactorError, setTwoFactorError] = useState('');
   const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false);
+  const [tempToken, setTempToken] = useState('');
   
   // 2FA setup states
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
@@ -333,6 +334,7 @@ export default function AdminDashboard() {
         if (data.requiresTwoFactor) {
           // Нужен 2FA код
           setRequiresTwoFactor(true);
+          setTempToken(data.tempToken);
         } else {
           // 2FA не требуется, сразу логиним
           setToken(data.token);
@@ -387,7 +389,10 @@ export default function AdminDashboard() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/verify-2fa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: twoFactorToken })
+        body: JSON.stringify({ 
+          token: twoFactorToken,
+          tempToken: tempToken
+        })
       });
       
       const data = await res.json();
@@ -397,6 +402,7 @@ export default function AdminDashboard() {
         localStorage.setItem('adminToken', data.token);
         setRequiresTwoFactor(false);
         setTwoFactorToken('');
+        setTempToken('');
       } else {
         setTwoFactorError(data.error || 'Invalid verification code');
       }
@@ -637,6 +643,7 @@ export default function AdminDashboard() {
                     setRequiresTwoFactor(false);
                     setTwoFactorToken('');
                     setTwoFactorError('');
+                    setTempToken('');
                   }}
                   className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 rounded-lg transition-colors"
                 >
