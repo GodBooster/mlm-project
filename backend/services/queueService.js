@@ -349,7 +349,7 @@ class QueueService {
     console.log(`[QUEUE] Job ID: ${id}, Data:`, data);
     
     try {
-      const { email, username, password, referralCode } = data;
+      const { email, username, password, referralCode, registrationIp } = data;
       
       // Проверяем существование пользователя
       const existingUser = await prisma.user.findFirst({
@@ -375,7 +375,8 @@ class QueueService {
           referralCode,
           verificationToken,
           verificationCode,
-          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+          expiresAt: new Date(Date.now() + 180 * 1000), // 180 seconds (3 minutes)
+          registrationIp: registrationIp || 'unknown'
         },
         create: {
           email,
@@ -384,7 +385,8 @@ class QueueService {
           referralCode,
           verificationToken,
           verificationCode,
-          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+          expiresAt: new Date(Date.now() + 180 * 1000), // 180 seconds (3 minutes)
+          registrationIp: registrationIp || 'unknown'
         }
       });
 

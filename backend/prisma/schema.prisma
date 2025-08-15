@@ -20,7 +20,6 @@ model User {
   updatedAt                DateTime       @updatedAt
   username                 String         @unique
   wallet                   String?
-  depositAddress           String?
   isAdmin                  Boolean        @default(false)
   avatar                   String?
   emailVerificationExpires DateTime?
@@ -28,12 +27,13 @@ model User {
   emailVerified            Boolean        @default(false)
   isBlocked                Boolean        @default(false)
   lastLogin                DateTime?
-  // Поля для сброса пароля
-  passwordResetToken       String?
+  depositAddress           String?
   passwordResetExpires     DateTime?
-  // Поля для 2FA
-  twoFactorSecret          String?
+  passwordResetToken       String?
   twoFactorEnabled         Boolean        @default(false)
+  twoFactorSecret          String?
+  registrationIp           String?
+  lastLoginIp              String?
   investments              Investment[]
   transactions             Transaction[]
   referrer                 User?          @relation("ReferralRelation", fields: [referredBy], references: [referralCode])
@@ -95,17 +95,32 @@ model DefiPosition {
   currentApy Float
   entryTvl   Float
   currentTvl Float
-  exitApy    Float?
-  exitTvl    Float?
   status     PositionStatus
   entryDate  DateTime
   exitDate   DateTime?
   exitReason String?
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
+  exitApy    Float?
+  exitTvl    Float?
   user       User           @relation(fields: [userId], references: [id])
 
   @@map("defi_positions")
+}
+
+model PendingRegistration {
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  username          String
+  password          String
+  referralCode      String?
+  verificationToken String   @unique
+  verificationCode  String
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+  registrationIp    String?
+
+  @@map("pending_registrations")
 }
 
 enum TransactionType {
@@ -124,20 +139,6 @@ enum TransactionStatus {
   COMPLETED
   FAILED
   CANCELLED
-}
-
-model PendingRegistration {
-  id                    Int      @id @default(autoincrement())
-  email                 String   @unique
-  username              String
-  password              String
-  referralCode          String?
-  verificationToken     String   @unique
-  verificationCode      String
-  expiresAt             DateTime
-  createdAt             DateTime @default(now())
-  
-  @@map("pending_registrations")
 }
 
 enum PositionStatus {

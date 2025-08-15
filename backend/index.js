@@ -74,6 +74,17 @@ const app = express()
 // Настройка для работы с прокси (Cloudflare, Nginx)
 app.set('trust proxy', 1)
 
+// Функция для получения реального IP адреса
+const getClientIp = (req) => {
+  return req.headers['cf-connecting-ip'] || 
+         req.headers['x-forwarded-for']?.split(',')[0] || 
+         req.headers['x-real-ip'] || 
+         req.connection.remoteAddress || 
+         req.socket.remoteAddress || 
+         req.ip || 
+         'unknown'
+}
+
 // Rate Limiting Configuration
 // Лимит для логина: 20 попыток в минуту с одного IP
 const loginLimiter = rateLimit({
@@ -607,11 +618,15 @@ app.post('/api/register', registerLimiter, async (req, res) => {
         return res.status(400).json({ error: 'User with this email or username already exists' });
       }
 
+      // Получаем IP адрес клиента
+      const clientIp = getClientIp(req);
+
       const jobId = await queueService.addUserRegistration({
         email,
         username: userName,
         password,
-        referralCode: referralId
+        referralCode: referralId,
+        registrationIp: clientIp
       });
       
       if (jobId) {
@@ -660,6 +675,9 @@ app.post('/api/register', registerLimiter, async (req, res) => {
       console.log(`|mlm-backend  | [REGISTRATION] LINK: ${verifyUrl}`);
       console.log(`|mlm-backend  | [REGISTRATION] MODE: FALLBACK-SYNC`);
       
+      // Получаем IP адрес клиента
+      const clientIp = getClientIp(req);
+      
       // Сохраняем данные во временную таблицу PendingRegistration
       // Используем upsert для обновления существующих записей
       await prisma.pendingRegistration.upsert({
@@ -670,7 +688,8 @@ app.post('/api/register', registerLimiter, async (req, res) => {
           referralCode: referralId,
           verificationToken,
           verificationCode,
-          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+          expiresAt: new Date(Date.now() + 180 * 1000), // 180 seconds (3 minutes)
+          registrationIp: clientIp
         },
         create: {
           email,
@@ -679,7 +698,8 @@ app.post('/api/register', registerLimiter, async (req, res) => {
           referralCode: referralId,
           verificationToken,
           verificationCode,
-          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+          expiresAt: new Date(Date.now() + 180 * 1000), // 180 seconds (3 minutes)
+          registrationIp: clientIp
         }
       });
 
@@ -719,6 +739,18 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
+
+    // Получаем IP адрес клиента
+    const clientIp = getClientIp(req);
+    
+    // Обновляем IP последнего входа
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLogin: new Date(),
+        lastLoginIp: clientIp
+      }
+    });
 
     // Generate token
     const token = generateToken(user)
@@ -1297,7 +1329,8 @@ app.post('/api/verify-email', async (req, res) => {
         password: hashedPassword,
           referralCode: userReferralCode,
           emailVerified: true, // Сразу подтвержден
-          referredBy: pendingRegistration.referralCode || null
+          referredBy: pendingRegistration.referralCode || null,
+          registrationIp: pendingRegistration.registrationIp || null
         }
       });
 
@@ -3037,7 +3070,7 @@ app.get('/api/admin/me', authenticateToken, async (req, res) => {
     console.error('Admin get current user error:', error);
     res.status(500).json({ error: 'Failed to get current user' });
   }
-});
+}); 
 
 // DELETE /api/admin/user/:id — удаление пользователя (только для админа)
 app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
