@@ -59,6 +59,9 @@ process.on('SIGTERM', async () => {
 
 const app = express()
 
+// Настройка для работы с прокси (Cloudflare, Nginx)
+app.set('trust proxy', 1)
+
 // Rate Limiting Configuration
 // Лимит для логина: 20 попыток в минуту с одного IP
 const loginLimiter = rateLimit({
