@@ -28,7 +28,6 @@ class EmailService {
       from: `${process.env.SMTP_FROM_NAME || 'Margine Space'} <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
       to,
       subject,
-      html,
       headers: {
         'X-Priority': '3',
         'X-MSMail-Priority': 'Normal',
@@ -36,6 +35,7 @@ class EmailService {
         'X-Report-Abuse': 'Please report abuse here: abuse@margine-space.com',
         'List-Unsubscribe': '<mailto:unsubscribe@margine-space.com>'
       },
+      html,
       text: text || this.htmlToText(html)
     }
 
@@ -368,7 +368,7 @@ class EmailService {
                 
                 <div class="security-note">
                     <h3>🔒 Security Information</h3>
-                    <p>This verification link expires in <strong>10 minutes</strong> for your security. If you didn't create an account with Margine Space, please ignore this email.</p>
+                    <p>This verification link expires in <strong>3 minutes</strong> for your security. If you didn't create an account with Margine Space, please ignore this email.</p>
                 </div>
             </div>
             
@@ -671,7 +671,7 @@ class EmailService {
                 
                 <div class="timer-section">
                     <p><strong>⏰ Time Remaining</strong></p>
-                    <div class="timer">60 Minutes</div>
+                    <div class="timer">3 Minutes</div>
                     <p>This reset link will expire for your security</p>
                 </div>
                 

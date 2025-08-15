@@ -11,12 +11,13 @@ import referralService from './services/referral-service.js'
 import rankService from './services/rank-service.js'
 import rankRewardService, { MLM_RANKS } from './services/rank-reward-service.js'
 import optimizedRankRewardService from './optimized-rank-service.js'
-import { authenticateToken, generateToken } from './middleware/auth.js'
+import { authenticateToken, generateToken, requireEmailVerification } from './middleware/auth.js'
 import nodemailer from 'nodemailer'
 import crypto from 'crypto'
 import emailService from './services/email-service.js'
 import queueService from './services/queueService.js'
 import systemUpdater from './system-updater.js'
+import { startCleanupScheduler } from './jobs/cleanup-pending-registrations.js'
 
 const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
@@ -106,6 +107,9 @@ scheduler.start().catch(console.error)
 
 // Start system updater
 systemUpdater.start().catch(console.error)
+
+// Start cleanup scheduler for pending registrations
+startCleanupScheduler()
 
 // Middleware для обработки ошибок Prisma (упрощенная версия)
 app.use((error, req, res, next) => {
@@ -407,7 +411,7 @@ async function sendVerificationEmail(to, code, token) {
               </div>
               <p class="instruction">
                   Enter this code on the verification page to activate your account.
-                  <br><strong>The code is valid for 1 minute.</strong>
+                  <br><strong>The code is valid for 3 minutes.</strong>
               </p>
               <a href="${verifyUrl}" class="cta-button">Verify Account</a>
               <div class="divider"></div>
@@ -552,14 +556,28 @@ app.post('/api/register', async (req, res) => {
       console.log(`|mlm-backend  | [REGISTRATION] LINK: ${verifyUrl}`);
       console.log(`|mlm-backend  | [REGISTRATION] MODE: FALLBACK-SYNC`);
       
-      // Store verification code and token temporarily
-      if (!global.verificationCodes) global.verificationCodes = new Map()
-      global.verificationCodes.set(email, {
-        code: verificationCode,
-        token: verificationToken,
-        expires: Date.now() + 10 * 60 * 1000, // 10 minutes
-        userData: { email, name: userName, password, referralId }
-      })
+      // Сохраняем данные во временную таблицу PendingRegistration
+      // Используем upsert для обновления существующих записей
+      await prisma.pendingRegistration.upsert({
+        where: { email },
+        update: {
+          username: userName,
+          password,
+          referralCode: referralId,
+          verificationToken,
+          verificationCode,
+          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+        },
+        create: {
+          email,
+          username: userName,
+          password,
+          referralCode: referralId,
+          verificationToken,
+          verificationCode,
+          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+        }
+      });
 
       // Синхронная отправка email через Contabo SMTP
       try {
@@ -638,14 +656,14 @@ app.post('/api/reset-password', async (req, res) => {
     console.log(`|mlm-backend  | [PASSWORD-RESET] EMAIL: ${email}`);
     console.log(`|mlm-backend  | [PASSWORD-RESET] TOKEN: ${resetToken}`);
     console.log(`|mlm-backend  | [PASSWORD-RESET] LINK: ${resetUrl}`);
-    console.log(`|mlm-backend  | [PASSWORD-RESET] EXPIRES: ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}`);
+    console.log(`|mlm-backend  | [PASSWORD-RESET] EXPIRES: ${new Date(Date.now() + 180 * 1000).toISOString()}`);
     
-    // Store reset token in user record with expiry (1 hour)
+    // Store reset token in user record with expiry (3 minutes)
     await prisma.user.update({
       where: { id: user.id },
       data: { 
         passwordResetToken: resetToken,
-        passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+        passwordResetExpires: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
       }
     })
 
@@ -757,245 +775,194 @@ app.post('/api/reset-password-confirm', async (req, res) => {
   }
 })
 
-app.post('/api/verify-email', async (req, res) => {
+app.post('/api/resend-verification', async (req, res) => {
   try {
-    const { email, code } = req.body
-    console.log(`|mlm-backend  | [VERIFY_CODE] Starting code verification for email: ${email}, code: ${code}`);
-
-    // Check if verification code exists and is valid
-    if (!global.verificationCodes || !global.verificationCodes.has(email)) {
-      console.log(`|mlm-backend  | [VERIFY_CODE] ERROR: No verification code found for email: ${email}`);
-      return res.status(400).json({ error: 'Invalid or expired verification code' })
-    }
-
-    const verificationData = global.verificationCodes.get(email)
-    console.log(`|mlm-backend  | [VERIFY_CODE] Found verification data for ${email}, stored code: ${verificationData.code}`);
+    const { email } = req.body;
     
-    // Check if code is expired
-    const now = Date.now();
-    const expiresAt = verificationData.expires;
-    console.log(`|mlm-backend  | [VERIFY_CODE] Time check - Now: ${now}, Expires: ${expiresAt}, Valid: ${now <= expiresAt}`);
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
     
-    if (now > expiresAt) {
-      console.log(`|mlm-backend  | [VERIFY_CODE] ERROR: Code expired for email: ${email}`);
-      global.verificationCodes.delete(email)
-      return res.status(400).json({ error: 'Verification code has expired' })
-    }
-
-    // Check if code matches
-    if (verificationData.code !== code) {
-      console.log(`|mlm-backend  | [VERIFY_CODE] ERROR: Code mismatch. Expected: ${verificationData.code}, Received: ${code}`);
-      return res.status(400).json({ error: 'Invalid verification code' })
-    }
-
-    console.log(`|mlm-backend  | [VERIFY_CODE] Code verification successful for ${email}`);
-
-    // Get user data from verification
-    const { userData } = verificationData
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(userData.password, 10)
+    // Проверяем, есть ли незавершенная регистрация
+    const pendingRegistration = await prisma.pendingRegistration.findUnique({
+      where: { email }
+    });
     
-
-    // Generate referral code
-    const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: userData.email,
-        username: userData.name,
-        password: hashedPassword,
-        referralCode,
-        referredBy: userData.referralId || null
-      }
-    })
-
-    // Process referral if referralId provided
-    if (userData.referralId) {
-      try {
-        // Find referrer by referral code or ID
-        const referrer = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { referralCode: userData.referralId },
-              { id: parseInt(userData.referralId) || 0 }
-            ]
-          }
-        });
-        
-        if (referrer) {
-          await referralService.processReferral(user.id, referrer.referralCode)
-        } else {
-          console.error('Referrer not found for code/ID:', userData.referralId)
-        }
-      } catch (error) {
-        console.error('Referral processing failed:', error)
-      }
+    if (!pendingRegistration) {
+      return res.status(404).json({ error: 'No pending registration found for this email' });
     }
-
-    // Clean up verification data
-    global.verificationCodes.delete(email)
-
-    // Generate token
-    const token = generateToken(user)
-
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user
+    
+    // Проверяем, не истек ли срок
+    if (pendingRegistration.expiresAt < new Date()) {
+      // Удаляем истекшую запись
+      await prisma.pendingRegistration.delete({
+        where: { id: pendingRegistration.id }
+      });
+      return res.status(400).json({ error: 'Verification link has expired. Please register again.' });
+    }
+    
+    // Отправляем email заново
+    try {
+      await emailService.sendVerificationEmail(
+        pendingRegistration.email, 
+        pendingRegistration.verificationCode, 
+        pendingRegistration.verificationToken
+      );
 
     res.json({
       success: true,
-      token,
-      user: userWithoutPassword
-    })
+        message: 'Verification email sent again' 
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      res.status(500).json({ error: 'Failed to send verification email' });
+    }
+    
   } catch (error) {
-    console.error('Email verification error:', error)
-    res.status(500).json({ error: 'Email verification failed' })
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Failed to resend verification' });
   }
-})
+});
 
-// Verify email by token (for link-based verification)
-app.post('/api/verify-email-token', async (req, res) => {
+// POST endpoint для проверки кода, который вводит пользователь
+app.post('/api/verify-email', async (req, res) => {
   try {
-    const { token } = req.body
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Starting verification for token: ${token?.substring(0, 16)}...`);
+    const { email, code } = req.body;
+    console.log(`[VERIFY_CODE] Starting code verification for email: ${email}, code: ${code}`);
 
-    if (!token) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: No token provided`);
-      return res.status(400).json({ error: 'Token is required' })
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and verification code are required' });
     }
 
-    // Find verification data by token
-    if (!global.verificationCodes) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: No verification codes in memory`);
-      return res.status(400).json({ error: 'Invalid or expired verification token' })
-    }
-
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Searching through ${global.verificationCodes.size} stored codes`);
-
-    let verificationData = null
-    let verificationEmail = null
-
-    // Search through all verification codes to find the matching token
-    for (const [email, data] of global.verificationCodes.entries()) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] Checking email: ${email}, token: ${data.token?.substring(0, 16)}...`);
-      if (data.token === token) {
-        verificationData = data
-        verificationEmail = email
-        console.log(`|mlm-backend  | [VERIFY_TOKEN] FOUND matching token for email: ${email}`);
-        
-        // IMMEDIATELY remove token to prevent concurrent usage
-        global.verificationCodes.delete(email);
-        console.log(`|mlm-backend  | [VERIFY_TOKEN] Token immediately locked/removed to prevent concurrent access`);
-        break
-      }
-    }
-
-    if (!verificationData) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] INFO: Token not found (likely already used by concurrent request)`);
-      // Return success silently - don't show error to frontend
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Email verification already completed',
-        alreadyProcessed: true
-      })
-    }
-
-    // Check if user already exists (prevent double creation)
-    const existingUser = await prisma.user.findUnique({
-      where: { email: verificationEmail }
+    // Ищем pending registration по email
+    const pendingRegistration = await prisma.pendingRegistration.findUnique({
+      where: { email }
     });
-    
-    if (existingUser) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: User already exists for email: ${verificationEmail}`);
-      return res.status(400).json({ error: 'User already registered' });
-    }
 
-    // Check if token is expired
-    const now = Date.now();
-    const expiresAt = verificationData.expires;
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Time check - Now: ${now}, Expires: ${expiresAt}, Valid: ${now <= expiresAt}`);
-    
-    if (now > expiresAt) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR: Token expired for email: ${verificationEmail}`);
-      return res.status(400).json({ error: 'Verification token has expired' })
-    }
-
-    // Get user data from verification
-    const { userData } = verificationData
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Processing user data for email: ${userData.email}`);
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(userData.password, 10)
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Password hashed successfully`);
-
-    // Generate referral code
-    const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Generated referral code: ${referralCode}`);
-
-    // Create user
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Creating user in database...`);
-    const user = await prisma.user.create({
-      data: {
-        email: userData.email,
-        username: userData.name,
-        password: hashedPassword,
-        referralCode,
-        referredBy: userData.referralId || null
+    if (!pendingRegistration) {
+      console.log(`[VERIFY_CODE] ❌ No pending registration found for: ${email}`);
+      
+      // Проверяем, может пользователь уже есть в основной таблице, но не подтвержден
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, emailVerified: true, emailVerificationToken: true }
+      });
+      
+      if (existingUser && !existingUser.emailVerified) {
+        console.log(`[VERIFY_CODE] ❌ User exists but not verified. Use token verification instead.`);
+        return res.status(400).json({ 
+          error: 'This email is already registered but not verified. Please use the verification link from your email.',
+          useTokenVerification: true
+        });
       }
-    })
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] User created successfully with ID: ${user.id}`);
+      
+      return res.status(400).json({ error: 'No pending registration found for this email. Please register first.' });
+    }
 
-    // Process referral if referralId provided
-    if (userData.referralId) {
-      console.log(`|mlm-backend  | [VERIFY_TOKEN] Processing referral for code/ID: ${userData.referralId}`);
-      try {
-        // Find referrer by referral code or ID
-        const referrer = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { referralCode: userData.referralId },
-              { id: parseInt(userData.referralId) || 0 }
-            ]
-          }
+    // Проверяем, не истек ли срок
+    if (pendingRegistration.expiresAt < new Date()) {
+      console.log(`[VERIFY_CODE] ❌ Code expired for: ${email}`);
+      // Удаляем истекшую запись
+      await prisma.pendingRegistration.delete({
+        where: { id: pendingRegistration.id }
+      });
+      return res.status(400).json({ error: 'Verification code has expired. Please register again.' });
+    }
+
+    // Проверяем код
+    if (pendingRegistration.verificationCode !== code) {
+      console.log(`[VERIFY_CODE] ❌ Code mismatch. Expected: ${pendingRegistration.verificationCode}, Received: ${code}`);
+      return res.status(400).json({ 
+        error: 'Invalid verification code', 
+        message: 'The verification code you entered is incorrect. Please check and try again.',
+        canRetry: true
+      });
+    }
+
+    console.log(`[VERIFY_CODE] ✅ Code verification successful for: ${email}`);
+
+    // Создаем пользователя в основной таблице
+    const hashedPassword = await bcrypt.hash(pendingRegistration.password, 12);
+    const userReferralCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+    
+    const newUser = await prisma.$transaction(async (tx) => {
+      // Создаем пользователя
+      const user = await tx.user.create({
+      data: {
+          email: pendingRegistration.email,
+          username: pendingRegistration.username,
+        password: hashedPassword,
+          referralCode: userReferralCode,
+          emailVerified: true, // Сразу подтвержден
+          referredBy: pendingRegistration.referralCode || null
+        }
+      });
+
+      // Обрабатываем реферала если есть
+      if (pendingRegistration.referralCode) {
+        const referrer = await tx.user.findUnique({
+          where: { referralCode: pendingRegistration.referralCode }
         });
         
         if (referrer) {
-          console.log(`|mlm-backend  | [VERIFY_TOKEN] Found referrer: ${referrer.email} (${referrer.referralCode})`);
-          await referralService.processReferral(user.id, referrer.referralCode)
-          console.log(`|mlm-backend  | [VERIFY_TOKEN] Referral processed successfully`);
-        } else {
-          console.log(`|mlm-backend  | [VERIFY_TOKEN] WARNING: Referrer not found for code/ID: ${userData.referralId}`);
+          // Добавляем бонус рефереру
+          await tx.transaction.create({
+            data: {
+              userId: referrer.id,
+              type: 'REFERRAL_BONUS',
+              amount: 10, // $10 за реферала
+              description: `Referral bonus for ${user.email}`,
+              status: 'COMPLETED'
+            }
+          });
         }
-      } catch (referralError) {
-        console.log(`|mlm-backend  | [VERIFY_TOKEN] ERROR processing referral:`, referralError.message);
       }
-    }
 
-    // Generate JWT token for immediate login
-    const token_jwt = generateToken(user)
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Generated JWT token for auto-login`);
+      return user;
+    });
 
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] SUCCESS: Email verification completed for ${user.email}`);
+    // Удаляем запись из временной таблицы
+    await prisma.pendingRegistration.delete({
+      where: { id: pendingRegistration.id }
+    });
+    
+    console.log(`[VERIFY_CODE] ✅ User created successfully: ${newUser.email}`);
+    
+    // Генерируем JWT токен для автоматического логина
+    const jwtToken = generateToken(newUser);
     
     res.json({ 
       success: true, 
       message: 'Email verified successfully',
-      token: token_jwt,
+      token: jwtToken,
       user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        referralCode: user.referralCode
+        id: newUser.id,
+        email: newUser.email,
+        username: newUser.username,
+        balance: newUser.balance,
+        bonus: newUser.bonus,
+        rank: newUser.rank,
+        referralCode: newUser.referralCode,
+        referredBy: newUser.referredBy,
+        isAdmin: newUser.isAdmin,
+        emailVerified: true,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt,
+        wallet: newUser.wallet,
+        lastLogin: newUser.lastLogin,
+        isBlocked: newUser.isBlocked
       }
-    })
+    });
   } catch (error) {
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] CRITICAL ERROR: ${error.message}`);
-    console.log(`|mlm-backend  | [VERIFY_TOKEN] Error stack:`, error.stack);
-    res.status(500).json({ error: 'Email verification failed' })
+    console.error('[VERIFY_CODE] ❌ Email verification error:', error);
+    res.status(500).json({ error: 'Email verification failed' });
   }
-})
+});
 
+// GET endpoint ВРЕМЕННО ОТКЛЮЧЕН - используйте только POST с кодом
+// TODO: Включить обратно после отладки
+
+/*
 app.get('/api/verify-email', async (req, res) => {
   const { token } = req.query;
   if (!token) {
@@ -1005,55 +972,91 @@ app.get('/api/verify-email', async (req, res) => {
   console.log(`[VERIFY_TOKEN] Starting verification for token: ${token.substring(0, 20)}...`);
   
   try {
-    // Проверяем токен верификации в таблице User
-    console.log(`[VERIFY_TOKEN] 🔍 Checking verification token in User table...`);
+    // Проверяем токен верификации в таблице PendingRegistration
+    console.log(`[VERIFY_TOKEN] 🔍 Checking verification token in PendingRegistration table...`);
     
-    const user = await prisma.user.findFirst({
+    const pendingRegistration = await prisma.pendingRegistration.findFirst({
       where: {
-        emailVerificationToken: token,
-        emailVerificationExpires: { gte: new Date() },
+        verificationToken: token,
+        expiresAt: { gte: new Date() },
       },
     });
     
-    if (user) {
-      console.log(`[VERIFY_TOKEN] ✅ Token found in User table for: ${user.email}`);
+    if (pendingRegistration) {
+      console.log(`[VERIFY_TOKEN] ✅ Token found in PendingRegistration for: ${pendingRegistration.email}`);
       
-      await prisma.user.update({
-        where: { id: user.id },
+      // Создаем пользователя в основной таблице
+      const hashedPassword = await bcrypt.hash(pendingRegistration.password, 12);
+      const userReferralCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+      
+      const newUser = await prisma.$transaction(async (tx) => {
+        // Создаем пользователя
+        const user = await tx.user.create({
         data: {
-          emailVerified: true,
-          emailVerificationToken: null,
-          emailVerificationExpires: null,
-        },
+            email: pendingRegistration.email,
+            username: pendingRegistration.username,
+            password: hashedPassword,
+            referralCode: userReferralCode,
+            emailVerified: true, // Сразу подтвержден
+            referredBy: pendingRegistration.referralCode || null
+          }
+        });
+
+        // Обрабатываем реферала если есть
+        if (pendingRegistration.referralCode) {
+          const referrer = await tx.user.findUnique({
+            where: { referralCode: pendingRegistration.referralCode }
+          });
+          
+          if (referrer) {
+            // Добавляем бонус рефереру
+            await tx.transaction.create({
+              data: {
+                userId: referrer.id,
+                type: 'REFERRAL_BONUS',
+                amount: 10, // $10 за реферала
+                description: `Referral bonus for ${user.email}`,
+                status: 'COMPLETED'
+              }
+            });
+          }
+        }
+
+        return user;
+      });
+
+      // Удаляем запись из временной таблицы
+      await prisma.pendingRegistration.delete({
+        where: { id: pendingRegistration.id }
       });
       
-      console.log(`[VERIFY_TOKEN] ✅ Email verified successfully for: ${user.email}`);
+      console.log(`[VERIFY_TOKEN] ✅ User created successfully: ${newUser.email}`);
       
       // Генерируем JWT токен для автоматического логина
-      const token = generateToken(user);
+      const jwtToken = generateToken(newUser);
       
       // Возвращаем JWT токен + данные пользователя для автоматического логина
       return res.json({ 
         success: true, 
         message: 'Email verified successfully',
-        email: user.email,
-        token: token,
+        email: newUser.email,
+        token: jwtToken,
         user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          balance: user.balance,
-          bonus: user.bonus,
-          rank: user.rank,
-          referralCode: user.referralCode,
-          referredBy: user.referredBy,
-          isAdmin: user.isAdmin,
+          id: newUser.id,
+          email: newUser.email,
+          username: newUser.username,
+          balance: newUser.balance,
+          bonus: newUser.bonus,
+          rank: newUser.rank,
+          referralCode: newUser.referralCode,
+          referredBy: newUser.referredBy,
+          isAdmin: newUser.isAdmin,
           emailVerified: true,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-          wallet: user.wallet,
-          lastLogin: user.lastLogin,
-          isBlocked: user.isBlocked
+          createdAt: newUser.createdAt,
+          updatedAt: newUser.updatedAt,
+          wallet: newUser.wallet,
+          lastLogin: newUser.lastLogin,
+          isBlocked: newUser.isBlocked
         }
       });
     }
@@ -1069,6 +1072,7 @@ app.get('/api/verify-email', async (req, res) => {
     res.status(500).json({ error: 'Failed to verify email' });
   }
 });
+*/
 
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
@@ -1188,7 +1192,7 @@ app.post('/api/wallet', authenticateToken, async (req, res) => {
 })
 
 // Generate deposit address using merchant API
-app.post('/api/deposit/generate-address', authenticateToken, async (req, res) => {
+app.post('/api/deposit/generate-address', authenticateToken, requireEmailVerification, async (req, res) => {
   try {
     const { network = 'BSC' } = req.body
     const userId = req.user.id
@@ -1330,7 +1334,7 @@ app.post('/api/deposit', authenticateToken, async (req, res) => {
   }
 })
 
-app.post('/api/withdraw', authenticateToken, async (req, res) => {
+app.post('/api/withdraw', authenticateToken, requireEmailVerification, async (req, res) => {
   try {
     const { amount, wallet } = req.body
     const userId = req.user.id
@@ -1505,7 +1509,7 @@ app.get('/api/referral-stats', authenticateToken, async (req, res) => {
 })
 
 // Investment routes
-app.post('/api/investments', authenticateToken, async (req, res) => {
+app.post('/api/investments', authenticateToken, requireEmailVerification, async (req, res) => {
   try {
     const userId = req.user.id
     const { packageId, amount } = req.body

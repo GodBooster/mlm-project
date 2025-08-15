@@ -123,6 +123,20 @@ enum TransactionStatus {
   CANCELLED
 }
 
+model PendingRegistration {
+  id                    Int      @id @default(autoincrement())
+  email                 String   @unique
+  username              String
+  password              String
+  referralCode          String?
+  verificationToken     String   @unique
+  verificationCode      String
+  expiresAt             DateTime
+  createdAt             DateTime @default(now())
+  
+  @@map("pending_registrations")
+}
+
 enum PositionStatus {
   FARMING
   UNSTAKED

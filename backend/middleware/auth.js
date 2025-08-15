@@ -19,13 +19,24 @@ export const authenticateToken = (req, res, next) => {
   })
 }
 
+export const requireEmailVerification = (req, res, next) => {
+  if (!req.user.emailVerified) {
+    return res.status(403).json({ 
+      error: 'Email verification required',
+      code: 'EMAIL_NOT_VERIFIED'
+    })
+  }
+  next()
+}
+
 export const generateToken = (user) => {
   return jwt.sign(
     { 
       id: user.id, 
       email: user.email, 
       username: user.username,
-      isAdmin: user.isAdmin || false
+      isAdmin: user.isAdmin || false,
+      emailVerified: user.emailVerified || false
     }, 
     JWT_SECRET, 
     { expiresIn: '24h' }

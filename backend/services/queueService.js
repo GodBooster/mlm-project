@@ -351,87 +351,63 @@ class QueueService {
     try {
       const { email, username, password, referralCode } = data;
       
-      const result = await prisma.$transaction(async (tx) => {
-        // Проверяем существование пользователя
-        const existingUser = await tx.user.findFirst({
-          where: { OR: [{ email }, { username }] }
-        });
-        
-        if (existingUser) {
-          console.log(`[QUEUE] ⚠️ User already exists: ${email}, skipping registration`);
-          return existingUser; // Возвращаем существующего пользователя вместо ошибки
+      // Проверяем существование пользователя
+      const existingUser = await prisma.user.findFirst({
+        where: { OR: [{ email }, { username }] }
+      });
+      
+      if (existingUser) {
+        console.log(`[QUEUE] ⚠️ User already exists: ${email}, skipping registration`);
+        return existingUser;
+      }
+
+      // Генерируем код и токен верификации
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      
+      // Сохраняем данные во временную таблицу PendingRegistration
+      // Используем upsert для обновления существующих записей
+      await prisma.pendingRegistration.upsert({
+        where: { email },
+        update: {
+          username,
+          password,
+          referralCode,
+          verificationToken,
+          verificationCode,
+          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
+        },
+        create: {
+          email,
+          username,
+          password,
+          referralCode,
+          verificationToken,
+          verificationCode,
+          expiresAt: new Date(Date.now() + 180 * 1000) // 180 seconds (3 minutes)
         }
-
-        // Хешируем пароль
-        const hashedPassword = await bcrypt.hash(password, 12);
-        
-        // Генерируем уникальный реферальный код
-        const userReferralCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-        
-        // Создаем пользователя
-        const newUser = await tx.user.create({
-          data: {
-            email,
-            username,
-            password: hashedPassword,
-            referralCode: userReferralCode,
-            emailVerificationToken: crypto.randomBytes(32).toString('hex'),
-            emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-          }
-        });
-
-        // Обрабатываем реферала если есть
-        if (referralCode) {
-          const referrer = await tx.user.findUnique({
-            where: { referralCode }
-          });
-          
-          if (referrer) {
-            await tx.user.update({
-              where: { id: newUser.id },
-              data: { referredBy: referralCode }
-            });
-            
-            // Добавляем бонус рефереру в очередь
-            await this.addBonusCalculation({
-              userId: referrer.id,
-              type: 'REFERRAL_BONUS',
-              amount: 10, // $10 за реферала
-              referredUserId: newUser.id
-            });
-          }
-        }
-
-        return newUser;
       });
 
-      // Генерируем код верификации для логов
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
       // Формируем ссылку верификации
       const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
-      const verifyUrl = `${baseUrl}/verify?token=${result.emailVerificationToken}`;
+      const verifyUrl = `${baseUrl}/verify?token=${verificationToken}`;
       
       // ✅ ЛОГИРОВАНИЕ КОДОВ И ССЫЛОК
-      console.log(`|mlm-backend  | [REGISTRATION] EMAIL: ${result.email}`);
+      console.log(`|mlm-backend  | [REGISTRATION] EMAIL: ${email}`);
       console.log(`|mlm-backend  | [REGISTRATION] CODE: ${verificationCode}`);
-      console.log(`|mlm-backend  | [REGISTRATION] TOKEN: ${result.emailVerificationToken}`);
+      console.log(`|mlm-backend  | [REGISTRATION] TOKEN: ${verificationToken}`);
       console.log(`|mlm-backend  | [REGISTRATION] LINK: ${verifyUrl}`);
-
-      // Токен верификации уже сохранен в таблице User при создании пользователя
-      // emailVerificationToken и emailVerificationExpires уже установлены
-      console.log(`[QUEUE] ✅ Verification token already saved in User table for: ${result.email}`);
 
       // Отправляем email верификации в очередь
       await this.addEmailSend({
         type: 'EMAIL_VERIFICATION',
-        to: result.email,
+        to: email,
         code: verificationCode,
-        token: result.emailVerificationToken
+        token: verificationToken
       });
 
-      console.log(`[QUEUE] ✅ User registration completed: ${result.id}`);
-      return result;
+      console.log(`[QUEUE] ✅ Registration data saved to PendingRegistration for: ${email}`);
+      return { email, username, verificationCode, verificationToken };
     } catch (error) {
       console.error(`[QUEUE] ❌ User registration failed:`, error);
       throw error;
