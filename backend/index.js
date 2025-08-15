@@ -959,10 +959,7 @@ app.post('/api/verify-email', async (req, res) => {
   }
 });
 
-// GET endpoint ВРЕМЕННО ОТКЛЮЧЕН - используйте только POST с кодом
-// TODO: Включить обратно после отладки
-
-/*
+// GET endpoint для верификации по токену (ссылка в email)
 app.get('/api/verify-email', async (req, res) => {
   const { token } = req.query;
   if (!token) {
@@ -1072,7 +1069,6 @@ app.get('/api/verify-email', async (req, res) => {
     res.status(500).json({ error: 'Failed to verify email' });
   }
 });
-*/
 
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
