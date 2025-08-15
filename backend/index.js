@@ -1025,7 +1025,7 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
         tempToken,
         message: 'Enter code from Google Authenticator'
       });
-    } else {
+        } else {
       // Если 2FA не настроена, сразу логиним
       const token = generateToken(user);
       
@@ -1039,8 +1039,8 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
           isAdmin: user.isAdmin
         }
       });
-    }
-  } catch (error) {
+        }
+      } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
@@ -1106,7 +1106,7 @@ app.post('/api/admin/verify-2fa', async (req, res) => {
       // Успешная аутентификация
       const jwtToken = generateToken(user);
 
-      res.json({
+    res.json({
       success: true,
         message: 'Welcome to admin panel!',
         token: jwtToken,
@@ -1128,7 +1128,7 @@ app.post('/api/admin/verify-2fa', async (req, res) => {
 // Отключение 2FA (для экстренных случаев)
 app.post('/api/admin/disable-2fa', authenticateToken, async (req, res) => {
   try {
-    const { currentPassword } = req.body;
+    const { password } = req.body;
     const userId = req.user.id;
     
     const user = await prisma.user.findUnique({
@@ -1145,7 +1145,7 @@ app.post('/api/admin/disable-2fa', authenticateToken, async (req, res) => {
     }
     
     // Проверяем текущий пароль
-    const passwordValid = await bcrypt.compare(currentPassword, user.password);
+    const passwordValid = await bcrypt.compare(password, user.password);
     if (!passwordValid) {
       return res.status(401).json({ error: 'Invalid password' });
     }
@@ -3002,6 +3002,36 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to update user' });
   }
 }); 
+
+// GET /api/admin/me — получение информации о текущем админе
+app.get('/api/admin/me', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        isAdmin: true,
+        twoFactorEnabled: true,
+        createdAt: true
+      }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Admin get current user error:', error);
+    res.status(500).json({ error: 'Failed to get current user' });
+  }
+});
 
 // DELETE /api/admin/user/:id — удаление пользователя (только для админа)
 app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {

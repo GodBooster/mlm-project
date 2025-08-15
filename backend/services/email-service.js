@@ -25,16 +25,24 @@ class EmailService {
 
   async sendEmail(to, subject, html, text = null, retries = 3) {
     const mailOptions = {
-      from: `${process.env.SMTP_FROM_NAME || 'Margine Space'} <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
+      from: `"${process.env.SMTP_FROM_NAME || 'Margine Space'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
       to,
       subject,
       headers: {
         'X-Priority': '3',
         'X-MSMail-Priority': 'Normal',
-        'X-Mailer': 'Margine Space Mailer',
+        'X-Mailer': 'Margine Space Mailer v2.0',
         'X-Report-Abuse': 'Please report abuse here: abuse@margine-space.com',
-        'List-Unsubscribe': '<mailto:unsubscribe@margine-space.com>'
+        'List-Unsubscribe': '<mailto:unsubscribe@margine-space.com>',
+        'Precedence': 'bulk',
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        'X-Campaign': 'user-notification',
+        'X-Entity-Ref-ID': 'notification-' + Date.now()
       },
+      priority: 'normal',
+      messageId: `<notification-${Date.now()}@margine-space.com>`,
+      references: ['<notifications@margine-space.com>'],
+      inReplyTo: '<notifications@margine-space.com>',
       html,
       text: text || this.htmlToText(html)
     }
@@ -405,6 +413,28 @@ class EmailService {
     // Use localhost for development, production URL for production  
     const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+    
+    // Улучшенные заголовки для избежания спама
+    const mailOptions = {
+      from: `"Margine Space Security" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
+      to,
+      subject: '🔐 Password Reset Request - Margine Space',
+      headers: {
+        'X-Priority': '3',
+        'X-MSMail-Priority': 'Normal',
+        'X-Mailer': 'Margine Space Security Mailer',
+        'X-Report-Abuse': 'Please report abuse here: abuse@margine-space.com',
+        'List-Unsubscribe': '<mailto:unsubscribe@margine-space.com>',
+        'Precedence': 'bulk',
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        'X-Campaign': 'password-reset',
+        'X-Entity-Ref-ID': 'password-reset-' + Date.now()
+      },
+      priority: 'normal',
+      messageId: `<password-reset-${Date.now()}@margine-space.com>`,
+      references: ['<security@margine-space.com>'],
+      inReplyTo: '<security@margine-space.com>'
+    };
     const html = `
     <!DOCTYPE html>
     <html lang="en">

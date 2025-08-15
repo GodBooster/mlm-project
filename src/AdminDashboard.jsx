@@ -37,6 +37,14 @@ export default function AdminDashboard() {
   const [setupError, setSetupError] = useState('');
   const [settingUpTwoFactor, setSettingUpTwoFactor] = useState(false);
   
+  // 2FA status states
+  const [currentUser, setCurrentUser] = useState(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [showDisable2FA, setShowDisable2FA] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [disabling2FA, setDisabling2FA] = useState(false);
+  const [disableError, setDisableError] = useState('');
+  
   // State for editing packages
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPackage, setEditingPackage] = useState(null);
@@ -179,6 +187,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!token) return;
     loadData();
+    fetchCurrentUser();
   }, [token]);
 
   const loadData = async () => {
@@ -464,6 +473,7 @@ export default function AdminDashboard() {
         setTwoFactorSecret('');
         setTwoFactorQrCode('');
         setSetupVerificationCode('');
+        setTwoFactorEnabled(true);
         alert('2FA successfully enabled!');
       } else {
         setSetupError(data.error || 'Invalid verification code');
@@ -473,6 +483,56 @@ export default function AdminDashboard() {
     }
     
     setSettingUpTwoFactor(false);
+  };
+
+  const handleDisable2FA = async (e) => {
+    e.preventDefault();
+    setDisabling2FA(true);
+    setDisableError('');
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/disable-2fa`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ password: disablePassword })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setShowDisable2FA(false);
+        setDisablePassword('');
+        setTwoFactorEnabled(false);
+        alert('2FA successfully disabled!');
+      } else {
+        setDisableError(data.error || 'Failed to disable 2FA');
+      }
+    } catch {
+      setDisableError('Network error');
+    }
+    
+    setDisabling2FA(false);
+  };
+
+  const fetchCurrentUser = async () => {
+    if (!token) return;
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const user = await res.json();
+        setCurrentUser(user);
+        setTwoFactorEnabled(user.twoFactorEnabled || false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch current user:', error);
+    }
   };
 
   const handleShowHistory = async (user) => {
@@ -1043,23 +1103,48 @@ export default function AdminDashboard() {
                 <p className="text-gray-300 opacity-70 text-sm">Secure your admin account with Google Authenticator</p>
               </div>
               
-              {!showTwoFactorSetup ? (
+              {!showTwoFactorSetup && !showDisable2FA ? (
                 <div className="text-center py-8">
                   <div className="mb-6">
                     <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Settings size={32} className="text-orange-400" />
                     </div>
-                    <h4 className="text-xl font-semibold text-white mb-2">Enable 2FA Protection</h4>
-                    <p className="text-gray-300 mb-6">Add an extra layer of security to your admin account</p>
+                    <h4 className="text-xl font-semibold text-white mb-2">
+                      {twoFactorEnabled ? '2FA Protection Active' : 'Enable 2FA Protection'}
+                    </h4>
+                    <p className="text-gray-300 mb-6">
+                      {twoFactorEnabled 
+                        ? 'Your account is protected with two-factor authentication'
+                        : 'Add an extra layer of security to your admin account'
+                      }
+                    </p>
+                    
+                    {twoFactorEnabled && (
+                      <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+                        <div className="flex items-center justify-center gap-2 text-green-400">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-sm font-medium">2FA is enabled</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
-                  <button
-                    onClick={handleSetupTwoFactor}
-                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                    disabled={settingUpTwoFactor}
-                  >
-                    {settingUpTwoFactor ? 'Setting up...' : 'Setup 2FA'}
-                  </button>
+                  {twoFactorEnabled ? (
+                    <button
+                      onClick={() => setShowDisable2FA(true)}
+                      className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    >
+                      Disable 2FA
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSetupTwoFactor}
+                      className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                      disabled={settingUpTwoFactor}
+                    >
+                      {settingUpTwoFactor ? 'Setting up...' : 'Setup 2FA'}
+                    </button>
+                  )}
                   
                   {setupError && (
                     <div className="mt-4 text-red-400 text-sm">{setupError}</div>
@@ -1119,6 +1204,53 @@ export default function AdminDashboard() {
                             setTwoFactorQrCode('');
                             setSetupVerificationCode('');
                             setSetupError('');
+                          }}
+                          className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Disable 2FA Form */}
+              {showDisable2FA && (
+                <div className="max-w-md mx-auto">
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-white mb-4">Disable 2FA Protection</h4>
+                    <p className="text-gray-300 mb-4">Enter your password to disable two-factor authentication:</p>
+                    
+                    <form onSubmit={handleDisable2FA} className="space-y-4">
+                      <input
+                        type="password"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-red-500 focus:outline-none"
+                        value={disablePassword}
+                        onChange={e => setDisablePassword(e.target.value)}
+                        placeholder="Enter your password"
+                        required
+                      />
+                      
+                      {disableError && (
+                        <div className="text-red-400 text-sm">{disableError}</div>
+                      )}
+                      
+                      <div className="flex gap-3">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
+                          disabled={disabling2FA}
+                        >
+                          {disabling2FA ? 'Disabling...' : 'Disable 2FA'}
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDisable2FA(false);
+                            setDisablePassword('');
+                            setDisableError('');
                           }}
                           className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-all duration-200"
                         >
