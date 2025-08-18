@@ -96,7 +96,17 @@ const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false
+  skipSuccessfulRequests: false,
+  skip: (req) => {
+    const clientIP = getClientIp(req)
+    const trustedIPs = [
+      '127.0.0.1', 'localhost', '::1',
+      '49.13.212.207',
+      '138.199.150.49',
+      '185.102.186.51' // ваш IP адрес
+    ]
+    return trustedIPs.includes(clientIP)
+  }
 })
 
 // Лимит для регистрации: 10 попыток в час с одного IP
@@ -109,7 +119,17 @@ const registerLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false
+  skipSuccessfulRequests: false,
+  skip: (req) => {
+    const clientIP = getClientIp(req)
+    const trustedIPs = [
+      '127.0.0.1', 'localhost', '::1',
+      '49.13.212.207',
+      '138.199.150.49',
+      '185.102.186.51' // ваш IP адрес
+    ]
+    return trustedIPs.includes(clientIP)
+  }
 })
 
 // Лимит для API запросов: 100 запросов в час с одного IP (исключая системные IP)
@@ -125,12 +145,13 @@ const apiLimiter = rateLimit({
   skipSuccessfulRequests: false,
   skip: (req) => {
     // Пропускаем системные IP и IP проекта
-    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress
+    const clientIP = getClientIp(req)
     const systemIPs = [
       '127.0.0.1', 'localhost', '::1', // localhost
       '49.13.212.207', // ваш сервер
       '138.199.150.49', // база данных
-      '162.244.24.181' // SMTP сервер
+      '162.244.24.181', // SMTP сервер
+      '185.102.186.51' // ваш IP адрес
     ]
     return systemIPs.includes(clientIP)
   }
