@@ -61,9 +61,11 @@ class SystemUpdater {
       // Fetch fresh pool data
       const pools = await this.fetchPools();
       if (!pools || pools.length === 0) {
-        console.log('❌ No pools data available');
+        console.log('❌ No pools data available, skipping update');
         return;
       }
+      
+      console.log(`📊 Processing ${pools.length} pools...`);
 
       // Get current positions
       const currentPositions = await this.getCurrentPositions();
@@ -115,28 +117,42 @@ class SystemUpdater {
 */
 
 async fetchPools() {
-  try {
-    // Принудительно использовать IPv4
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд
-    
-    const response = await fetch(CONFIG.API_URL, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'MLM-Backend/1.0'
+  const maxRetries = 3;
+  const retryDelay = 5000; // 5 секунд между попытками
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Attempt ${attempt}/${maxRetries} to fetch pools...`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд
+      
+      const response = await fetch(CONFIG.API_URL, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'MLM-Backend/1.0',
+          'Accept': 'application/json'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) throw new Error(`API returned ${response.status}`);
+      
+      const data = await response.json();
+      console.log(`✅ Fetched ${data.data?.length || 0} pools from API (attempt ${attempt})`);
+      return data.data || [];
+    } catch (error) {
+      console.error(`❌ Attempt ${attempt}/${maxRetries} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.error('❌ All attempts to fetch pools failed');
+        return [];
       }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    
-    const data = await response.json();
-    console.log(`✅ Fetched ${data.data?.length || 0} pools from API`);
-    return data.data || [];
-  } catch (error) {
-    console.error('Error fetching pools:', error.message);
-    return [];
+      
+      // Ждем перед следующей попыткой
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
   }
 }
 
