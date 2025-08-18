@@ -3267,9 +3267,6 @@ app.post('/api/defi-positions/system', async (req, res) => {
     console.log('[DEFI POSITIONS SYSTEM SAVE] Endpoint called');
     const { positions } = req.body;
 
-    // Удаляем ВСЕ существующие позиции (системные данные для всех пользователей)
-    await prisma.defiPosition.deleteMany({});
-
     // Ограничиваем количество активных позиций до 5
     const activePositions = positions.filter(p => p.status === 'farming' || p.status === 'FARMING').slice(0, 5);
     const closedPositions = positions.filter(p => p.status === 'unstaked' || p.status === 'UNSTAKED');
@@ -3277,13 +3274,42 @@ app.post('/api/defi-positions/system', async (req, res) => {
     // Объединяем активные (максимум 5) и закрытые позиции
     const finalPositions = [...activePositions, ...closedPositions];
 
-    // Создаем новые позиции
-    console.log('[DEFI POSITIONS SYSTEM SAVE] Creating positions with userId = 1');
-    const createdPositions = await Promise.all(
-      finalPositions.map(position => 
-        prisma.defiPosition.create({
+    // Получаем существующие позиции
+    const existingPositions = await prisma.defiPosition.findMany({
+      where: { userId: 1 }
+    });
+
+    // Создаем карту существующих позиций по poolId
+    const existingPositionsMap = new Map(
+      existingPositions.map(pos => [pos.poolId, pos])
+    );
+
+    const createdPositions = [];
+    const updatedPositions = [];
+
+    // Обрабатываем каждую позицию
+    for (const position of finalPositions) {
+      const existingPosition = existingPositionsMap.get(position.poolId);
+      
+      if (existingPosition) {
+        // Обновляем существующую позицию
+        const updated = await prisma.defiPosition.update({
+          where: { id: existingPosition.id },
           data: {
-            userId: 1, // Принудительно устанавливаем userId = 1
+            currentApy: position.currentApy,
+            currentTvl: position.currentTvl,
+            status: position.status === 'farming' || position.status === 'FARMING' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
+            exitDate: position.exitDate ? new Date(position.exitDate) : null,
+            exitReason: position.exitReason,
+            updatedAt: new Date()
+          }
+        });
+        updatedPositions.push(updated);
+      } else {
+        // Создаем новую позицию
+        const created = await prisma.defiPosition.create({
+          data: {
+            userId: 1,
             poolId: position.poolId,
             symbol: position.symbol,
             project: position.project,
@@ -3297,13 +3323,32 @@ app.post('/api/defi-positions/system', async (req, res) => {
             exitDate: position.exitDate ? new Date(position.exitDate) : null,
             exitReason: position.exitReason
           }
-        })
-      )
-    );
+        });
+        createdPositions.push(created);
+      }
+    }
 
-    console.log('[DEFI POSITIONS SYSTEM SAVE] Saved', createdPositions.length, 'positions (', activePositions.length, 'active,', closedPositions.length, 'closed)');
-    console.log('[DEFI POSITIONS SYSTEM SAVE] First position userId:', createdPositions[0]?.userId);
-    res.json(createdPositions);
+    // Удаляем позиции, которых больше нет в новых данных
+    const newPoolIds = new Set(finalPositions.map(p => p.poolId));
+    const positionsToDelete = existingPositions.filter(pos => !newPoolIds.has(pos.poolId));
+    
+    if (positionsToDelete.length > 0) {
+      await prisma.defiPosition.deleteMany({
+        where: {
+          id: { in: positionsToDelete.map(p => p.id) }
+        }
+      });
+    }
+
+    const allPositions = [...createdPositions, ...updatedPositions];
+    console.log('[DEFI POSITIONS SYSTEM SAVE] Processed positions:', {
+      created: createdPositions.length,
+      updated: updatedPositions.length,
+      deleted: positionsToDelete.length,
+      total: allPositions.length
+    });
+    
+    res.json(allPositions);
   } catch (error) {
     console.error('[DEFI POSITIONS SYSTEM SAVE ERROR]', error);
     res.status(500).json({ error: error.message });
