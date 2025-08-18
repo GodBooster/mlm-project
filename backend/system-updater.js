@@ -122,7 +122,7 @@ async fetchPools() {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Attempt ${attempt}/${maxRetries} to fetch pools...`);
+      // console.log(`🔄 Attempt ${attempt}/${maxRetries} to fetch pools...`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд
@@ -143,12 +143,12 @@ async fetchPools() {
       console.log(`✅ Fetched ${data.data?.length || 0} pools from API (attempt ${attempt})`);
       return data.data || [];
     } catch (error) {
-      console.error(`❌ Attempt ${attempt}/${maxRetries} failed:`, error.message);
+      // console.error(`❌ Attempt ${attempt}/${maxRetries} failed:`, error.message);
       
-      if (attempt === maxRetries) {
-        console.error('❌ All attempts to fetch pools failed');
-        return [];
-      }
+              if (attempt === maxRetries) {
+          console.error('❌ All attempts to fetch pools failed');
+          return [];
+        }
       
       // Ждем перед следующей попыткой
       await new Promise(resolve => setTimeout(resolve, retryDelay));
