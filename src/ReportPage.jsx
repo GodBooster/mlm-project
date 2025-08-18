@@ -797,7 +797,7 @@ const ReportPage = ({ userData }) => {
                         </td>
                       </tr>
                     ) : (
-                      closedPositions.slice(0, 10).map((position, index) => {
+                      closedPositions.map((position, index) => {
                      const entryMonthlyAPR = calculateMonthlyAPR(position.entryApy);
                      const daysDiff = position.exitDate 
                        ? Math.floor((new Date(position.exitDate) - new Date(position.entryDate)) / (1000 * 60 * 60 * 24))
