@@ -17,20 +17,21 @@ async function fixMissingReferralCodes() {
   try {
     console.log('🔧 Fixing missing referral codes...');
     
-    // Находим пользователей без referral кодов
-    const usersWithoutReferralCode = await prisma.user.findMany({
-      where: {
-        OR: [
-          { referralCode: null },
-          { referralCode: '' }
-        ]
-      },
+    // Получаем всех пользователей
+    const allUsers = await prisma.user.findMany({
       select: {
         id: true,
         email: true,
         referralCode: true
       }
     });
+    
+    console.log(`Found ${allUsers.length} total users`);
+    
+    // Фильтруем пользователей без referral кодов
+    const usersWithoutReferralCode = allUsers.filter(user => 
+      !user.referralCode || user.referralCode === ''
+    );
     
     console.log(`Found ${usersWithoutReferralCode.length} users without referral codes`);
     
@@ -81,15 +82,25 @@ async function fixMissingReferralCodes() {
     
     // Проверяем результат
     const finalCheck = await prisma.user.findMany({
-      where: {
-        OR: [
-          { referralCode: null },
-          { referralCode: '' }
-        ]
+      select: {
+        id: true,
+        email: true,
+        referralCode: true
       }
     });
     
-    console.log(`📊 Final check: ${finalCheck.length} users still without referral codes`);
+    const stillMissing = finalCheck.filter(user => 
+      !user.referralCode || user.referralCode === ''
+    );
+    
+    console.log(`📊 Final check: ${stillMissing.length} users still without referral codes`);
+    
+    if (stillMissing.length > 0) {
+      console.log('\n⚠️ Users still without referral codes:');
+      stillMissing.forEach(user => {
+        console.log(`   - User ${user.id} (${user.email})`);
+      });
+    }
     
   } catch (error) {
     console.error('❌ Error fixing missing referral codes:', error);
