@@ -1933,6 +1933,14 @@ app.get('/api/referral-link', authenticateToken, async (req, res) => {
       select: { referralCode: true }
     })
 
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    if (!user.referralCode) {
+      return res.status(400).json({ error: 'Referral code not found for user' })
+    }
+
     const link = `${req.protocol}://${req.get('host')}/invite/${user.referralCode}`
     res.json({ link })
   } catch (error) {
