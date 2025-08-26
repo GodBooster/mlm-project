@@ -157,4 +157,7 @@ temp/
 README_FILES/
 
 # NPM cache
-.npm-cache/ 
+.npm-cache/
+
+# Manual backup documentation
+файл ручной бекап DB на сервере 138.199.150.49.md 
