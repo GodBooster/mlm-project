@@ -67,3 +67,4 @@ Required GitHub Secrets:
 - SERVER_HOST
 - SERVER_USERNAME
 - SSH_PRIVATE_KEY
+# Trigger deployment
