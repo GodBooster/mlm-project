@@ -159,9 +159,15 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 
-// Логирование всех запросов
+// Детальное логирование всех запросов
 app.use((req, res, next) => {
   console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`📋 Headers:`, {
+    origin: req.headers.origin,
+    'user-agent': req.headers['user-agent'],
+    'x-forwarded-for': req.headers['x-forwarded-for'],
+    'cf-connecting-ip': req.headers['cf-connecting-ip']
+  });
   next();
 });
 
