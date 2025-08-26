@@ -16,19 +16,16 @@ jobs:
         with:
           node-version: '18'
           
-      - name: Setup NPM
-        run: |
-          npm config set registry https://registry.npmjs.org/
-          npm config set fetch-retries 5
-          npm config set fetch-retry-factor 2
-          npm config set fetch-retry-mintimeout 20000
-          npm config set fetch-retry-maxtimeout 120000
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
           
-      - name: Install Dependencies
+      - name: Skip Dependencies Install (Install on server only)
         run: |
-          npm cache clean --force
-          npm install --no-optional --prefer-offline
-          cd backend && npm cache clean --force && npm install --no-optional --prefer-offline
+          echo "Skipping dependency installation in CI - will install on server"
+          mkdir -p node_modules
+          cd backend && mkdir -p node_modules
           
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
@@ -39,9 +36,8 @@ jobs:
           script: |
             cd /opt/mlm-project
             git pull origin main
-            npm cache clean --force
-            npm install --no-optional --prefer-offline
+            npm install -g pnpm
+            pnpm install --frozen-lockfile
             cd backend
-            npm cache clean --force
-            npm install --no-optional --prefer-offline
+            pnpm install --frozen-lockfile
             pm2 restart mlm-backend 
