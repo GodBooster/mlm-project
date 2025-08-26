@@ -1,10 +1,10 @@
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import multer from 'multer'
 import sharp from 'sharp'
-import { PrismaClient, TransactionStatus, PositionStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import scheduler from './jobs/scheduler.js'
 import investmentService from './services/investment-service.js'
 import referralService from './services/referral-service.js'
@@ -2057,6 +2057,162 @@ app.get('/api/investments/stats', authenticateToken, async (req, res) => {
   }
 })
 
+// Admin: Disable user from investments
+app.post('/api/admin/investments/disable-user', authenticateToken, async (req, res) => {
+  try {
+    // Проверяем что пользователь админ
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    const { userId, reason = 'Admin disabled' } = req.body
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' })
+    }
+
+    // Отключаем все активные инвестиции пользователя
+    const result = await prisma.$transaction(async (tx) => {
+      // Получаем все активные инвестиции пользователя
+      const activeInvestments = await tx.investment.findMany({
+        where: {
+          userId: parseInt(userId),
+          isActive: true
+        },
+        include: {
+          package: true,
+          user: true
+        }
+      })
+
+      if (activeInvestments.length === 0) {
+        return { message: 'No active investments found for this user' }
+      }
+
+      // Отключаем все инвестиции
+      const updatedInvestments = await tx.investment.updateMany({
+        where: {
+          userId: parseInt(userId),
+          isActive: true
+        },
+        data: {
+          isActive: false
+        }
+      })
+
+      // Создаем транзакции для каждой отключенной инвестиции
+      for (const investment of activeInvestments) {
+        await tx.transaction.create({
+          data: {
+            userId: parseInt(userId),
+            investmentId: investment.id,
+            type: 'INVESTMENT',
+            amount: investment.amount,
+            description: `Investment disabled by admin: ${reason}`,
+            status: 'CANCELLED'
+          }
+        })
+      }
+
+      return {
+        message: `Successfully disabled ${updatedInvestments.count} investments`,
+        disabledCount: updatedInvestments.count,
+        investments: activeInvestments.map(inv => ({
+          id: inv.id,
+          packageName: inv.package.name,
+          amount: inv.amount,
+          totalEarned: inv.totalEarned
+        }))
+      }
+    })
+
+    console.log(`[ADMIN] User ${userId} investments disabled by admin ${req.user.id}: ${result.message}`)
+    res.json({ success: true, ...result })
+
+  } catch (error) {
+    console.error('[ADMIN] Error disabling user investments:', error)
+    res.status(500).json({ error: 'Failed to disable user investments' })
+  }
+})
+
+// Admin: Enable user investments (re-enable)
+app.post('/api/admin/investments/enable-user', authenticateToken, async (req, res) => {
+  try {
+    // Проверяем что пользователь админ
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    const { userId, reason = 'Admin enabled' } = req.body
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' })
+    }
+
+    // Включаем все отключенные инвестиции пользователя
+    const result = await prisma.$transaction(async (tx) => {
+      // Получаем все отключенные инвестиции пользователя
+      const disabledInvestments = await tx.investment.findMany({
+        where: {
+          userId: parseInt(userId),
+          isActive: false
+        },
+        include: {
+          package: true,
+          user: true
+        }
+      })
+
+      if (disabledInvestments.length === 0) {
+        return { message: 'No disabled investments found for this user' }
+      }
+
+      // Включаем все инвестиции
+      const updatedInvestments = await tx.investment.updateMany({
+        where: {
+          userId: parseInt(userId),
+          isActive: false
+        },
+        data: {
+          isActive: true
+        }
+      })
+
+      // Создаем транзакции для каждой включенной инвестиции
+      for (const investment of disabledInvestments) {
+        await tx.transaction.create({
+          data: {
+            userId: parseInt(userId),
+            investmentId: investment.id,
+            type: 'INVESTMENT',
+            amount: investment.amount,
+            description: `Investment re-enabled by admin: ${reason}`,
+            status: 'COMPLETED'
+          }
+        })
+      }
+
+      return {
+        message: `Successfully enabled ${updatedInvestments.count} investments`,
+        enabledCount: updatedInvestments.count,
+        investments: disabledInvestments.map(inv => ({
+          id: inv.id,
+          packageName: inv.package.name,
+          amount: inv.amount,
+          totalEarned: inv.totalEarned
+        }))
+      }
+    })
+
+    console.log(`[ADMIN] User ${userId} investments enabled by admin ${req.user.id}: ${result.message}`)
+    res.json({ success: true, ...result })
+
+  } catch (error) {
+    console.error('[ADMIN] Error enabling user investments:', error)
+    res.status(500).json({ error: 'Failed to enable user investments' })
+  }
+})
+
 // Referral routes
 app.post('/api/referrals/process', async (req, res) => {
   try {
@@ -2928,7 +3084,7 @@ app.post('/api/admin/withdrawals/:id/reject', authenticateToken, requireAdmin, a
       
       await prisma.transaction.update({
         where: { id: parseInt(id) },
-        data: { status: TransactionStatus.FAILED }
+        data: { status: 'FAILED' }
       })
     }
     
@@ -3056,7 +3212,7 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
       if (field in req.body) updateData[field] = req.body[field];
     }
     if (req.body.password) {
-      const bcrypt = await import('bcrypt');
+      const bcrypt = await import('bcryptjs');
       updateData.password = await bcrypt.hash(req.body.password, 10);
     }
     const updatedUser = await prisma.user.update({
@@ -3241,7 +3397,7 @@ app.put('/api/admin/withdrawals/:id/hold', authenticateToken, requireAdmin, asyn
     const { id } = req.params;
     const tx = await prisma.transaction.update({
       where: { id: parseInt(id) },
-      data: { status: TransactionStatus.FAILED }
+      data: { status: 'FAILED' }
     });
     res.json({ success: true, transaction: tx });
   } catch (error) {
@@ -3326,7 +3482,7 @@ app.post('/api/defi-positions/system', async (req, res) => {
           data: {
             currentApy: position.currentApy,
             currentTvl: position.currentTvl,
-            status: position.status === 'farming' || position.status === 'FARMING' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
+            status: position.status === 'farming' || position.status === 'FARMING' ? 'FARMING' : 'UNSTAKED',
             exitDate: position.exitDate ? new Date(position.exitDate) : null,
             exitReason: position.exitReason,
             updatedAt: new Date()
@@ -3346,7 +3502,7 @@ app.post('/api/defi-positions/system', async (req, res) => {
             currentApy: position.currentApy,
             entryTvl: position.entryTvl,
             currentTvl: position.currentTvl,
-            status: position.status === 'farming' || position.status === 'FARMING' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
+            status: position.status === 'farming' || position.status === 'FARMING' ? 'FARMING' : 'UNSTAKED',
             entryDate: new Date(position.entryDate),
             exitDate: position.exitDate ? new Date(position.exitDate) : null,
             exitReason: position.exitReason
@@ -3413,7 +3569,7 @@ app.post('/api/defi-positions/:userId', authenticateToken, async (req, res) => {
             currentApy: position.currentApy,
             entryTvl: position.entryTvl,
             currentTvl: position.currentTvl,
-            status: position.status === 'farming' || position.status === 'FARMING' ? PositionStatus.FARMING : PositionStatus.UNSTAKED,
+            status: position.status === 'farming' || position.status === 'FARMING' ? 'FARMING' : 'UNSTAKED',
             entryDate: new Date(position.entryDate),
             exitDate: position.exitDate ? new Date(position.exitDate) : null,
             exitReason: position.exitReason
@@ -3441,7 +3597,7 @@ app.put('/api/defi-positions/system/update', async (req, res) => {
           where: { 
             userId: 1, // Системный пользователь
             poolId: position.poolId,
-            status: PositionStatus.FARMING
+            status: 'FARMING'
           },
           data: {
             currentApy: position.currentApy,
@@ -3478,7 +3634,7 @@ app.put('/api/defi-positions/:userId/update', authenticateToken, async (req, res
           where: { 
             userId: parseInt(userId),
             poolId: position.poolId,
-            status: PositionStatus.FARMING
+            status: 'FARMING'
           },
           data: {
             currentApy: position.currentApy,

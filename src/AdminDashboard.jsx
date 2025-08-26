@@ -90,6 +90,12 @@ export default function AdminDashboard() {
   const [selectedWithdrawals, setSelectedWithdrawals] = useState([]);
   const [batchApproving, setBatchApproving] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  
+  // Investment management states
+  const [investmentActionLoading, setInvestmentActionLoading] = useState(false);
+  const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+  const [investmentAction, setInvestmentAction] = useState(''); // 'disable' or 'enable'
+  const [investmentReason, setInvestmentReason] = useState('');
 
   // Фильтруем заявки на вывод:
   // Было:
@@ -239,6 +245,53 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     setToken('');
     localStorage.removeItem('adminToken');
+  };
+
+  // Investment management functions
+  const handleInvestmentAction = async (action, userId) => {
+    setInvestmentAction(action);
+    setShowInvestmentModal(true);
+  };
+
+  const confirmInvestmentAction = async () => {
+    if (!investmentReason.trim()) {
+      alert('Please provide a reason for this action');
+      return;
+    }
+
+    setInvestmentActionLoading(true);
+    try {
+      const endpoint = investmentAction === 'disable' 
+        ? '/api/admin/investments/disable-user'
+        : '/api/admin/investments/enable-user';
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          reason: investmentReason
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`${investmentAction === 'disable' ? 'Disabled' : 'Enabled'} ${result.disabledCount || result.enabledCount} investments: ${result.message}`);
+        setShowInvestmentModal(false);
+        setInvestmentReason('');
+        await loadData(); // Reload data
+      } else {
+        const error = await response.json();
+        alert(error.error || `Failed to ${investmentAction} investments`);
+      }
+    } catch (error) {
+      console.error(`Error ${investmentAction}ing investments:`, error);
+      alert(`Failed to ${investmentAction} investments`);
+    }
+    setInvestmentActionLoading(false);
   };
 
   const handleEditPackage = (pkg) => {
@@ -1504,6 +1557,18 @@ export default function AdminDashboard() {
               >
                 Delete
               </button>
+              <button
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                onClick={() => handleInvestmentAction('disable', selectedUser.id)}
+              >
+                Disable Investments
+              </button>
+              <button
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                onClick={() => handleInvestmentAction('enable', selectedUser.id)}
+              >
+                Enable Investments
+              </button>
             </div>
           </div>
         </div>
@@ -1701,6 +1766,66 @@ export default function AdminDashboard() {
                 onClick={closeWalletModal}
                 className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
               >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Investment Management Modal */}
+      {showInvestmentModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-8 rounded-2xl max-w-md w-full relative">
+            <button
+              type="button"
+              onClick={() => setShowInvestmentModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold focus:outline-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">
+              {investmentAction === 'disable' ? 'Disable' : 'Enable'} User Investments
+            </h3>
+            <div className="mb-6">
+              <p className="text-gray-300 mb-4">
+                {investmentAction === 'disable' 
+                  ? 'This will disable all active investments for this user. They will stop earning profits.'
+                  : 'This will re-enable all disabled investments for this user. They will start earning profits again.'
+                }
+              </p>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Reason (required)</label>
+                <textarea
+                  value={investmentReason}
+                  onChange={(e) => setInvestmentReason(e.target.value)}
+                  placeholder={`Reason for ${investmentAction === 'disable' ? 'disabling' : 'enabling'} investments...`}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none h-24 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmInvestmentAction}
+                disabled={investmentActionLoading || !investmentReason.trim()}
+                className={`flex-1 py-3 px-4 rounded-xl font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none ${
+                  investmentAction === 'disable'
+                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white'
+                    : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                }`}
+              >
+                {investmentActionLoading 
+                  ? 'Processing...' 
+                  : investmentAction === 'disable' 
+                    ? 'Disable Investments' 
+                    : 'Enable Investments'
+                }
+              </button>
+              <button
+                onClick={() => setShowInvestmentModal(false)}
+                className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

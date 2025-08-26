@@ -1,4 +1,4 @@
-import { PrismaClient, PositionStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -263,7 +263,7 @@ async fetchPools() {
         currentApy: pool.apy,
         entryTvl: pool.tvlUsd,
         currentTvl: pool.tvlUsd,
-        status: PositionStatus.FARMING,
+        status: 'FARMING',
         entryDate: new Date(),
         exitDate: null,
         exitReason: null
@@ -303,7 +303,7 @@ async fetchPools() {
         await prisma.defiPosition.update({
           where: { id: position.id },
           data: {
-            status: PositionStatus.UNSTAKED,
+            status: 'UNSTAKED',
             exitDate: position.exitDate,
             exitApy: position.exitApy,      // ✅ Сохраняем Exit APR
             exitTvl: position.exitTvl,      // ✅ Сохраняем Exit TVL
