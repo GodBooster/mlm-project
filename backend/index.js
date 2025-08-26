@@ -159,39 +159,13 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 
-// Настройка CORS для локальной разработки и продакшена
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    'https://margine-space.com',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ];
-  
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
-
-
 // Логирование всех запросов
 app.use((req, res, next) => {
   console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
-// Simple working CORS
+// Единая настройка CORS
 const allowedOrigins = [
   'https://margine-space.com',
   'https://transgresse.netlify.app',
@@ -202,15 +176,22 @@ const allowedOrigins = [
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  
+  // Разрешаем CORS для разрешенных доменов
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
+  
+  // Устанавливаем заголовки CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, Origin, X-Requested-With');
+  
+  // Обрабатываем preflight запросы
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+  
   next();
 });
 
