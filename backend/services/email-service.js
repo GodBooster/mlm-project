@@ -4,12 +4,12 @@ import nodemailer from 'nodemailer'
 class EmailService {
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'mail.margine-space.com',
+      host: process.env.SMTP_HOST || 'smtp.eu.mailgun.org',
       port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false, // false для 587, true для 465
+      secure: false, // false для 587 (STARTTLS)
       auth: {
-        user: process.env.SMTP_USER || 'mlmuser',
-        pass: process.env.SMTP_PASS || 'CoRK4gsQaUm6'
+        user: process.env.SMTP_USER || 'postmaster@mailer.margine-space.com',
+        pass: process.env.SMTP_PASS || '1dc8c3fe56e7055b2af1f3d6e79e7de8-5a4acb93-3dc4b6d2'
       },
       tls: {
         rejectUnauthorized: false,
@@ -24,8 +24,42 @@ class EmailService {
   }
 
   async sendEmail(to, subject, html, text = null, retries = 3) {
+    // Попробовать Mailgun API если SMTP не работает
+    if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+      try {
+        console.log(`[EMAIL] Attempting to send via Mailgun API to: ${to}`)
+        
+        const formData = new URLSearchParams();
+        formData.append('from', `"${process.env.SMTP_FROM_NAME || 'Margine Space'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@mailer.margine-space.com'}>`);
+        formData.append('to', to);
+        formData.append('subject', subject);
+        formData.append('html', html);
+        if (text) formData.append('text', text);
+        
+        const response = await fetch(`https://api.eu.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[EMAIL] Sent successfully via API to:', to, 'MessageID:', result.id);
+          return { success: true, messageId: result.id };
+        } else {
+          throw new Error(`Mailgun API error: ${response.status}`);
+        }
+      } catch (apiError) {
+        console.error('[EMAIL] API method failed, trying SMTP:', apiError.message);
+      }
+    }
+
+    // Fallback to SMTP
     const mailOptions = {
-      from: `"${process.env.SMTP_FROM_NAME || 'Margine Space'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
+      from: `"${process.env.SMTP_FROM_NAME || 'Margine Space'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@mailer.margine-space.com'}>`,
       to,
       subject,
       headers: {
@@ -40,9 +74,9 @@ class EmailService {
         'X-Entity-Ref-ID': 'notification-' + Date.now()
       },
       priority: 'normal',
-      messageId: `<notification-${Date.now()}@margine-space.com>`,
-      references: ['<notifications@margine-space.com>'],
-      inReplyTo: '<notifications@margine-space.com>',
+      messageId: `<notification-${Date.now()}@mailer.margine-space.com>`,
+      references: ['<notifications@mailer.margine-space.com>'],
+      inReplyTo: '<notifications@mailer.margine-space.com>',
       html,
       text: text || this.htmlToText(html)
     }

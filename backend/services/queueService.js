@@ -351,13 +351,13 @@ class QueueService {
     try {
       const { email, username, password, referralCode, registrationIp } = data;
       
-      // Проверяем существование пользователя
+        // Проверяем существование пользователя
       const existingUser = await prisma.user.findFirst({
-        where: { OR: [{ email }, { username }] }
-      });
-      
-      if (existingUser) {
-        console.log(`[QUEUE] ⚠️ User already exists: ${email}, skipping registration`);
+          where: { OR: [{ email }, { username }] }
+        });
+        
+        if (existingUser) {
+          console.log(`[QUEUE] ⚠️ User already exists: ${email}, skipping registration`);
         return existingUser;
       }
 
@@ -379,8 +379,8 @@ class QueueService {
           registrationIp: registrationIp || 'unknown'
         },
         create: {
-          email,
-          username,
+            email,
+            username,
           password,
           referralCode,
           verificationToken,
@@ -389,7 +389,7 @@ class QueueService {
           registrationIp: registrationIp || 'unknown'
         }
       });
-
+      
       // Формируем ссылку верификации
       const baseUrl = process.env.NODE_ENV === 'production' ? 'https://margine-space.com' : 'http://localhost:5173';
       const verifyUrl = `${baseUrl}/verify?token=${verificationToken}`;

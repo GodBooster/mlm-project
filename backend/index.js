@@ -306,16 +306,15 @@ app.get('/invite/:code', (req, res) => {
 })
 
 // Email sending utility
-// Email sending utility
 async function sendVerificationEmail(to, code, token) {
-  // Настройка транспорта
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || '162.244.24.181',
+  // Настройка транспорта для Mailgun
+  const transporter = nodemailer.createTransporter({
+    host: process.env.SMTP_HOST || 'smtp.eu.mailgun.org',
     port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
+    secure: false, // false для 587 (STARTTLS)
     auth: {
-      user: process.env.SMTP_USER || 'mlmuser',
-      pass: process.env.SMTP_PASS || 'CoRK4gsQaUm6'
+      user: process.env.SMTP_USER || 'postmaster@mailer.margine-space.com',
+      pass: process.env.SMTP_PASS || '1dc8c3fe56e7055b2af1f3d6e79e7de8-5a4acb93-3dc4b6d2'
     },
     tls: {
       rejectUnauthorized: false
