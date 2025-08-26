@@ -24,40 +24,7 @@ class EmailService {
   }
 
   async sendEmail(to, subject, html, text = null, retries = 3) {
-    // Попробовать Mailgun API если SMTP не работает
-    if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
-      try {
-        console.log(`[EMAIL] Attempting to send via Mailgun API to: ${to}`)
-        
-        const formData = new URLSearchParams();
-        formData.append('from', `"${process.env.SMTP_FROM_NAME || 'MargineSpace'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`);
-        formData.append('to', to);
-        formData.append('subject', subject);
-        formData.append('html', html);
-        if (text) formData.append('text', text);
-        
-        const response = await fetch(`https://api.eu.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: formData
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log('[EMAIL] Sent successfully via API to:', to, 'MessageID:', result.id);
-          return { success: true, messageId: result.id };
-        } else {
-          throw new Error(`Mailgun API error: ${response.status}`);
-        }
-      } catch (apiError) {
-        console.error('[EMAIL] API method failed, trying SMTP:', apiError.message);
-      }
-    }
-
-    // Fallback to SMTP
+    // Send via Resend SMTP
     const mailOptions = {
       from: `"${process.env.SMTP_FROM_NAME || 'MargineSpace'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
       to,
@@ -95,38 +62,7 @@ class EmailService {
     }
   }
 
-   // Альтернативный метод через другой SMTP порт
-   async sendEmailAlternative(to, subject, html, text = null) {
-    const alternativeTransporter = nodemailer.createTransport({
-      host: 'mail.margine-space.com',
-      port: 465, // SSL порт
-      secure: true,
-      auth: {
-        user: 'mlmuser',
-        pass: 'CoRK4gsQaUm6'
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    })
 
-    const mailOptions = {
-      from: 'Margine Space <noreply@margine-space.com>',
-      to,
-      subject,
-      html,
-      text: text || this.htmlToText(html)
-    }
-
-    try {
-      const result = await alternativeTransporter.sendMail(mailOptions)
-      console.log('[EMAIL] Alternative method successful:', result.messageId)
-      return { success: true, messageId: result.messageId }
-    } catch (error) {
-      console.error('[EMAIL] Alternative method failed:', error.message)
-      throw error
-    }
-  }
 
 
   async sendVerificationEmail(to, code, token) {
