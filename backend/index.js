@@ -309,12 +309,12 @@ app.get('/invite/:code', (req, res) => {
 async function sendVerificationEmail(to, code, token) {
   // Настройка транспорта для Mailgun
   const transporter = nodemailer.createTransporter({
-    host: process.env.SMTP_HOST || 'smtp.eu.mailgun.org',
+    host: process.env.SMTP_HOST || 'smtp.resend.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: false, // false для 587 (STARTTLS)
     auth: {
-      user: process.env.SMTP_USER || 'postmaster@mailer.margine-space.com',
-      pass: process.env.SMTP_PASS || '1dc8c3fe56e7055b2af1f3d6e79e7de8-5a4acb93-3dc4b6d2'
+      user: process.env.SMTP_USER || 'resend',
+      pass: process.env.SMTP_PASS || 're_iN7pDkP8_54RfiVzgh8nk4aJoAsmZ14vC'
     },
     tls: {
       rejectUnauthorized: false

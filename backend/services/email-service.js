@@ -8,8 +8,8 @@ class EmailService {
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false, // false для 587 (STARTTLS)
       auth: {
-        user: process.env.SMTP_USER || 'postmaster@mailer.margine-space.com',
-        pass: process.env.SMTP_PASS || '1dc8c3fe56e7055b2af1f3d6e79e7de8-5a4acb93-3dc4b6d2'
+        user: process.env.SMTP_USER || 'resend',
+        pass: process.env.SMTP_PASS || 're_iN7pDkP8_54RfiVzgh8nk4aJoAsmZ14vC'
       },
       tls: {
         rejectUnauthorized: false,
@@ -30,7 +30,7 @@ class EmailService {
         console.log(`[EMAIL] Attempting to send via Mailgun API to: ${to}`)
         
         const formData = new URLSearchParams();
-        formData.append('from', `"${process.env.SMTP_FROM_NAME || 'Margine Space'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@mailer.margine-space.com'}>`);
+        formData.append('from', `"${process.env.SMTP_FROM_NAME || 'MargineSpace'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`);
         formData.append('to', to);
         formData.append('subject', subject);
         formData.append('html', html);
@@ -59,13 +59,13 @@ class EmailService {
 
     // Fallback to SMTP
     const mailOptions = {
-      from: `"${process.env.SMTP_FROM_NAME || 'Margine Space'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@mailer.margine-space.com'}>`,
+      from: `"${process.env.SMTP_FROM_NAME || 'MargineSpace'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@margine-space.com'}>`,
       to,
       subject,
       headers: {
         'X-Priority': '3',
         'X-MSMail-Priority': 'Normal',
-        'X-Mailer': 'Margine Space Mailer v2.0',
+        'X-Mailer': 'MargineSpace Mailer v2.0',
         'X-Report-Abuse': 'Please report abuse here: abuse@margine-space.com',
         'List-Unsubscribe': '<mailto:unsubscribe@margine-space.com>',
         'Precedence': 'bulk',
@@ -74,9 +74,9 @@ class EmailService {
         'X-Entity-Ref-ID': 'notification-' + Date.now()
       },
       priority: 'normal',
-      messageId: `<notification-${Date.now()}@mailer.margine-space.com>`,
-      references: ['<notifications@mailer.margine-space.com>'],
-      inReplyTo: '<notifications@mailer.margine-space.com>',
+      messageId: `<notification-${Date.now()}@margine-space.com>`,
+      references: ['<notifications@margine-space.com>'],
+      inReplyTo: '<notifications@margine-space.com>',
       html,
       text: text || this.htmlToText(html)
     }
