@@ -16,10 +16,19 @@ jobs:
         with:
           node-version: '18'
           
+      - name: Setup NPM
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          
       - name: Install Dependencies
         run: |
-          npm install
-          cd backend && npm install
+          npm cache clean --force
+          npm install --no-optional --prefer-offline
+          cd backend && npm cache clean --force && npm install --no-optional --prefer-offline
           
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
@@ -28,9 +37,11 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }} # например, root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /root/mlm-project
-            git pull
-            npm install
+            cd /opt/mlm-project
+            git pull origin main
+            npm cache clean --force
+            npm install --no-optional --prefer-offline
             cd backend
-            npm install
-            pm2 restart all 
+            npm cache clean --force
+            npm install --no-optional --prefer-offline
+            pm2 restart mlm-backend 

@@ -154,4 +154,7 @@ tmp/
 temp/
 
 # README Files (документация)
-README_FILES/ 
+README_FILES/
+
+# NPM cache
+.npm-cache/ 
