@@ -151,4 +151,7 @@ dist
 
 # Temporary folders
 tmp/
-temp/ 
+temp/
+
+# README Files (документация)
+README_FILES/ 
