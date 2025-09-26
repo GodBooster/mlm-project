@@ -8,8 +8,7 @@ class DeFiReportService {
   constructor() {
     this.defaultSettings = {
       initialAmount: 100000,        // $100,000
-      maxActivePositions: 5,        // 5 пулов
-      amountPerPool: 20000,         // $20,000 на пул
+      amountPerPool: 20000,         // $20,000 на пул (5 пулов)
       gasFees: {
         ethereum: 10,               // $10 общая комиссия Ethereum
         other: 1                    // $1 общая комиссия для других блокчейнов
@@ -18,10 +17,6 @@ class DeFiReportService {
       compound: true,               // реинвестирование
       startDate: '2024-01-01',      // дата начала
       endDate: null,                // null = текущая дата
-      minMonthlyAPR: 50,            // минимум 50% в месяц
-      minTVL: 500000,               // минимум $500K TVL
-      exitMonthlyAPR: 48,           // выход при падении ниже 48%
-      exitTVL: 450000,              // выход при падении ниже $450K
       calculationPeriodDays: 365    // период расчета в днях
     };
   }

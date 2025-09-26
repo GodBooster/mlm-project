@@ -21,7 +21,7 @@ import {
   Target
 } from 'lucide-react';
 import DeFiReportService from './services/DeFiReportService';
-import PDFReportService from './services/PDFReportService';
+import BeautifulPDFService from './services/BeautifulPDFService';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
@@ -45,8 +45,7 @@ const DeFiReportPage = () => {
   const [positions, setPositions] = useState([]);
   const [reportSettings, setReportSettings] = useState({
     initialAmount: 100000,        // $100,000
-    maxActivePositions: 5,        // 5 пулов
-    amountPerPool: 20000,         // $20,000 на пул
+    amountPerPool: 20000,         // $20,000 на пул (5 пулов)
     gasFees: {
       ethereum: 10,               // $10 за депозит/вывод
       other: 1                    // $1 для других блокчейнов
@@ -55,10 +54,6 @@ const DeFiReportPage = () => {
     compound: true,               // реинвестирование
     startDate: '2024-01-01',      // дата начала
     endDate: null,                // null = текущая дата
-    minMonthlyAPR: 50,            // минимум 50% в месяц
-    minTVL: 500000,               // минимум $500K TVL
-    exitMonthlyAPR: 48,           // выход при падении ниже 48%
-    exitTVL: 450000,              // выход при падении ниже $450K
     calculationPeriodDays: 365    // период расчета в днях
   });
   const [loading, setLoading] = useState(false);
@@ -139,7 +134,7 @@ const DeFiReportPage = () => {
         project: position.project,
         chain: position.chain,
         apr: position.entryApy,
-        reason: `APR > ${reportSettings.minMonthlyAPR}%`,
+        reason: `APR > 50%`,
         color: 'green'
       });
       
@@ -147,7 +142,7 @@ const DeFiReportPage = () => {
       if (exitTime) {
         const exitReason = profit.netProfit < 0 
           ? `Stop-Loss triggered (${profit.roi.toFixed(1)}%)`
-          : `APR < ${reportSettings.exitMonthlyAPR}%`;
+          : `APR < 48%`;
         
         activities.push({
           id: `exit_${position.id}`,
@@ -331,7 +326,7 @@ const DeFiReportPage = () => {
       console.log('Advanced Analytics:', advancedAnalytics);
 
       // Generate PDF
-      const doc = await PDFReportService.generatePDFReport(
+      const doc = await BeautifulPDFService.generatePDFReport(
         pdfData,
         positions,
         reportSettings,
@@ -1201,7 +1196,7 @@ const DeFiReportPage = () => {
                 {reportStats.activePositions} active
               </span>
             </div>
-            <p className="text-gray-300 opacity-70 text-sm">Current DeFi positions with virtual $20,000 each</p>
+         
           </div>
           
           {reportStats.activePositions === 0 ? (
@@ -1851,7 +1846,7 @@ const DeFiReportPage = () => {
                   onChange={(e) => setReportSettings(prev => ({ 
                     ...prev, 
                     initialAmount: parseFloat(e.target.value) || 100000,
-                    amountPerPool: (parseFloat(e.target.value) || 100000) / prev.maxActivePositions
+                    amountPerPool: (parseFloat(e.target.value) || 100000) / 5
                   }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
                   min="1000"
@@ -1859,22 +1854,6 @@ const DeFiReportPage = () => {
                 />
               </div>
 
-              {/* Max Active Positions */}
-              <div>
-                <label className="block text-gray-300 mb-2">Max Active Positions</label>
-                <input
-                  type="number"
-                  value={reportSettings.maxActivePositions}
-                  onChange={(e) => setReportSettings(prev => ({ 
-                    ...prev, 
-                    maxActivePositions: parseInt(e.target.value) || 5,
-                    amountPerPool: prev.initialAmount / (parseInt(e.target.value) || 5)
-                  }))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                  min="1"
-                  max="10"
-                />
-              </div>
 
               {/* Gas Fees */}
               <div className="grid grid-cols-2 gap-4">
@@ -1930,57 +1909,6 @@ const DeFiReportPage = () => {
                 </div>
               </div>
 
-              {/* APR Thresholds */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-300 mb-2">Min Monthly APR (%)</label>
-                  <input
-                    type="number"
-                    value={reportSettings.minMonthlyAPR}
-                    onChange={(e) => setReportSettings(prev => ({ ...prev, minMonthlyAPR: parseFloat(e.target.value) || 50 }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                    min="0"
-                    step="1"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 mb-2">Exit Monthly APR (%)</label>
-                  <input
-                    type="number"
-                    value={reportSettings.exitMonthlyAPR}
-                    onChange={(e) => setReportSettings(prev => ({ ...prev, exitMonthlyAPR: parseFloat(e.target.value) || 48 }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                    min="0"
-                    step="1"
-                  />
-                </div>
-              </div>
-
-              {/* TVL Thresholds */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-300 mb-2">Min TVL ($)</label>
-                  <input
-                    type="number"
-                    value={reportSettings.minTVL}
-                    onChange={(e) => setReportSettings(prev => ({ ...prev, minTVL: parseFloat(e.target.value) || 500000 }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                    min="0"
-                    step="10000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 mb-2">Exit TVL ($)</label>
-                  <input
-                    type="number"
-                    value={reportSettings.exitTVL}
-                    onChange={(e) => setReportSettings(prev => ({ ...prev, exitTVL: parseFloat(e.target.value) || 450000 }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-orange-500 focus:outline-none"
-                    min="0"
-                    step="10000"
-                  />
-                </div>
-              </div>
 
               {/* Calculation Period */}
               <div>
