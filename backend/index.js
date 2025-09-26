@@ -3243,16 +3243,20 @@ app.put('/api/admin/withdrawals/:id/hold', authenticateToken, requireAdmin, asyn
 // Системный endpoint для демонстрации (без аутентификации)
 app.get('/api/defi-positions/system', async (req, res) => {
   try {
+    console.log('[DEFI POSITIONS GET] System mode - fetching all positions...');
+    
     // Возвращаем ВСЕ позиции из базы данных (системные данные для всех пользователей)
     const positions = await prisma.defiPosition.findMany({
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log('[DEFI POSITIONS GET] System mode - returning all positions:', positions.length);
+    console.log('[DEFI POSITIONS GET] System mode - found positions:', positions.length);
+    console.log('[DEFI POSITIONS GET] Sample position:', positions[0] || 'No positions found');
 
     res.json(positions);
   } catch (error) {
     console.error('[DEFI POSITIONS GET ERROR]', error);
+    console.error('[DEFI POSITIONS GET ERROR] Stack:', error.stack);
     res.status(500).json({ error: error.message });
   }
 });

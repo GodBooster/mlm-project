@@ -502,7 +502,7 @@ const ReportPage = ({ userData }) => {
             <p className="text-gray-400">
               Monitoring profitable DeFi pools
               {lastUpdate && (
-                <span className="ml-2 text-xs text-gray-500">
+                <span className="ml-2 text-xs text-white-500">
                   • Last updated: {lastUpdate.toLocaleTimeString()}
                 </span>
               )}

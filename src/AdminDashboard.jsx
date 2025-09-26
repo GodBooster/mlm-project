@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, DollarSign, Package, Settings, LogOut, Eye, EyeOff, Search, Filter, Download, Plus } from 'lucide-react';
+import { Users, DollarSign, Package, Settings, LogOut, Eye, EyeOff, Search, Filter, Download, Plus, BarChart3 } from 'lucide-react';
 import AdminAddTransaction from './AdminAddTransaction';
+import DeFiReportPage from './DeFiReportPage';
 
 // Card without transparency
 const Card = ({ children, className = "" }) => (
@@ -563,6 +564,7 @@ export default function AdminDashboard() {
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'transactions', icon: Package, label: 'Transactions' },
     { id: 'packages', icon: Settings, label: 'Packages' },
+    { id: 'defi-report', icon: BarChart3, label: 'DeFi Report' },
     { id: '2fa', icon: Settings, label: '2FA Setup' },
     { id: 'logout', icon: LogOut, label: 'Logout' }
   ];
@@ -1300,6 +1302,11 @@ export default function AdminDashboard() {
                 </div>
               )}
             </Card>
+          )}
+
+          {/* DeFi Report */}
+          {currentPage === 'defi-report' && (
+            <DeFiReportPage />
           )}
         </div>
       </div>
